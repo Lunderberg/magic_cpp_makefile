@@ -11,10 +11,13 @@ LFLAGS =
 
 .SECONDARY:
 
-EXECUTABLES = $(patsubst %.cc,bin/%,$(wildcard *.cc))
+# Find the source files that will be used.
+EXE_SRC_FILES = $(wildcard *.cc)
+EXECUTABLES = $(patsubst %.cc,bin/%,$(EXE_SRC_FILES))
 SRC_FILES = $(wildcard src/*.cc)
 O_FILES = $(patsubst %.cc,build/%.o,$(SRC_FILES))
 
+# Update dependencies with each compilation
 CFLAGS += -MMD
 -include $(shell find build -name "*.d" 2> /dev/null)
 
@@ -22,13 +25,14 @@ CFLAGS += -MMD
 all: $(EXECUTABLES)
 
 bin/%: build/%.o $(O_FILES)
-	mkdir -p bin
-	g++ $(LFLAGS) $^ -o $@
+	@echo "Building $@"
+	@mkdir -p bin
+	@g++ $(LFLAGS) $^ -o $@
 
 build/%.o: %.cc
-	mkdir -p $(@D)
-	g++ -c $(CFLAGS) $< -o $@
-
+	@echo "Building $@"
+	@mkdir -p $(@D)
+	@g++ -c $(CFLAGS) $< -o $@
 
 clean:
 	rm -rf bin build
