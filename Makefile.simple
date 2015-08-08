@@ -1,0 +1,34 @@
+# This is a makefile intended for compiling simple C++ projects.
+# It assumes that you have one or more source files in the main directory,
+#    each of which contains an "int main()".
+# There may also be a "src" directory, containing additional source files.
+# All include files will be automatically listed as dependencies.
+
+CFLAGS = -Iinclude
+LFLAGS =
+
+# EVERYTHING PAST HERE SHOULD WORK AUTOMATICALLY
+
+.SECONDARY:
+
+EXECUTABLES = $(patsubst %.cc,bin/%,$(wildcard *.cc))
+SRC_FILES = $(wildcard src/*.cc)
+O_FILES = $(patsubst %.cc,build/%.o,$(SRC_FILES))
+
+CFLAGS += -MMD
+-include $(shell find build -name "*.d" 2> /dev/null)
+
+
+all: $(EXECUTABLES)
+
+bin/%: build/%.o $(O_FILES)
+	mkdir -p bin
+	g++ $(LFLAGS) $^ -o $@
+
+build/%.o: %.cc
+	mkdir -p $(@D)
+	g++ -c $(CFLAGS) $< -o $@
+
+
+clean:
+	rm -rf bin build
