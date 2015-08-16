@@ -5,9 +5,24 @@
 # These are compiled into a single library, specified by the LIB_NAME variable.
 # All include files will be automatically listed as dependencies.
 
+# Default build variables, can be overridden by command line options.
+
 LIB_NAME = MyLibrary
-CFLAGS = -Iinclude -fPIC
-LFLAGS = -Llib -l$(LIB_NAME) -Wl,-rpath,\$$ORIGIN/../lib
+
+CXX      = g++
+CPPFLAGS =
+CXXFLAGS = -g -O3
+LDFLAGS  =
+LDLIBS   =
+RM       = rm -f
+
+# Additional flags that are necessary to compile.
+# Even if not specified on the command line, these should be present.
+
+override CPPFLAGS += -Iinclude
+override CXXFLAGS += -fPIC
+override LDFLAGS  += -Llib -Wl,-rpath,\$$ORIGIN/../lib
+override LDLIBS   += -l$(LIB_NAME)
 
 # EVERYTHING PAST HERE SHOULD WORK AUTOMATICALLY
 
@@ -21,25 +36,25 @@ O_FILES = $(patsubst %.cc,build/%.o,$(SRC_FILES))
 
 all: $(EXECUTABLES) lib/lib$(LIB_NAME).so
 
+# Update dependencies with each compilation
+override CPPFLAGS += -MMD
+-include $(shell find build -name "*.d" 2> /dev/null)
+
 bin/%: build/%.o | lib/lib$(LIB_NAME).so
 	@echo "Building $@"
 	@mkdir -p $(@D)
-	@g++ $< $(LFLAGS) -o $@
+	@$(CXX) $(LDFLAGS) $< $(LDLIBS) -o $@
 
 lib/lib$(LIB_NAME).so: $(O_FILES)
 	@echo "Building $@"
 	@mkdir -p $(@D)
-	@g++ $^ -shared -Wl,-soname,lib$(LIB_NAME).so -o $@
+	@$(CXX) $^ -shared -Wl,-soname,lib$(LIB_NAME).so -o $@
 
 build/%.o: %.cc
 	@echo "Building $@"
 	@mkdir -p $(@D)
-	@g++ -c $(CFLAGS) $< -o $@
+	@$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
 
 clean:
 	@echo "Cleaning"
-	@rm -rf bin build lib
-
-# Update dependencies with each compilation
-CFLAGS += -MMD
--include $(shell find build -name "*.d" 2> /dev/null)
+	@$(RM) -r bin build lib

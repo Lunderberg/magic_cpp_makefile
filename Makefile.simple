@@ -4,8 +4,22 @@
 # There may also be a "src" directory, containing additional source files.
 # All include files will be automatically listed as dependencies.
 
-CFLAGS = -Iinclude
-LFLAGS =
+# Default build variables, can be overridden by command line options.
+
+CXX      = g++
+CPPFLAGS =
+CXXFLAGS = -g -O3
+LDFLAGS  =
+LDLIBS   =
+RM       = rm -f
+
+# Additional flags that are necessary to compile.
+# Even if not specified on the command line, these should be present.
+
+override CPPFLAGS += -Iinclude
+override CXXFLAGS +=
+override LDFLAGS  +=
+override LDLIBS   +=
 
 # EVERYTHING PAST HERE SHOULD WORK AUTOMATICALLY
 
@@ -19,20 +33,20 @@ O_FILES = $(patsubst %.cc,build/%.o,$(SRC_FILES))
 
 all: $(EXECUTABLES)
 
+# Update dependencies with each compilation
+override CPPFLAGS += -MMD
+-include $(shell find build -name "*.d" 2> /dev/null)
+
 bin/%: build/%.o $(O_FILES)
 	@echo "Building $@"
 	@mkdir -p bin
-	@g++ $(LFLAGS) $^ -o $@
+	@$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 build/%.o: %.cc
 	@echo "Building $@"
 	@mkdir -p $(@D)
-	@g++ -c $(CFLAGS) $< -o $@
+	@$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
 
 clean:
 	@echo "Cleaning"
-	@rm -rf bin build
-
-# Update dependencies with each compilation
-CFLAGS += -MMD
--include $(shell find build -name "*.d" 2> /dev/null)
+	@$(RM) -r bin build
