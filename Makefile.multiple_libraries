@@ -1,0 +1,76 @@
+# This is a makefile intended for compiling simple C++ projects.
+# It assumes that you have one or more source files in the main directory,
+#    each of which contains an "int main()".
+# There may also be a "src" directory, containing additional source files.
+# All include files will be automatically listed as dependencies.
+
+# Any folders starting with "lib" will be compiled into shared libraries.
+# libMyLibrary should contain libMyLibrary/src and libMyLibrary/include
+# -IlibMyLibrary/include will be added to the compiler flags
+# All .cc files in libMyLibrary/src will be compiled into the shared library.
+# The library will be created as lib/libMyLibrary.so
+
+
+
+# Default build variables, can be overridden by command line options.
+
+CXX      = g++
+CPPFLAGS =
+CXXFLAGS = -g -O3
+LDFLAGS  =
+LDLIBS   =
+RM       = rm -f
+
+# Additional flags that are necessary to compile.
+# Even if not specified on the command line, these should be present.
+
+override CPPFLAGS += -Iinclude
+override CXXFLAGS += -fPIC
+override LDFLAGS  += -Llib -Wl,-rpath,\$$ORIGIN/../lib -Wl,--no-as-needed
+override LDLIBS   +=
+
+# EVERYTHING PAST HERE SHOULD WORK AUTOMATICALLY
+
+.SECONDARY:
+.SECONDEXPANSION:
+
+# Find each library to be made.
+LIBRARY_FOLDERS   = $(wildcard lib?*)
+LIBRARY_OUTPUT    = $(patsubst %,lib/%.so,$(LIBRARY_FOLDERS))
+LIBRARY_INCLUDES  = $(patsubst %,-I%/include,$(LIBRARY_FOLDERS))
+override CPPFLAGS += $(LIBRARY_INCLUDES)
+LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(LIBRARY_FOLDERS))
+override LDLIBS   += $(LIBRARY_FLAGS)
+library_src_files = $(wildcard lib$(1)/src/*.cc)
+library_o_files   = $(patsubst %.cc,build/%.o,$(call library_src_files,$(1)))
+
+# Find the source files that will be used.
+EXE_SRC_FILES = $(wildcard *.cc)
+EXECUTABLES = $(patsubst %.cc,bin/%,$(EXE_SRC_FILES))
+SRC_FILES = $(wildcard src/*.cc)
+O_FILES = $(patsubst %.cc,build/%.o,$(SRC_FILES))
+
+all: $(EXECUTABLES) $(LIBRARY_OUTPUT)
+
+# Update dependencies with each compilation
+override CPPFLAGS += -MMD
+-include $(shell find build -name "*.d" 2> /dev/null)
+
+bin/%: build/%.o $(O_FILES) | $(LIBRARY_OUTPUT)
+	@echo "Building $@"
+	@mkdir -p $(@D)
+	@$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
+lib/lib%.so: $$(call library_o_files,%)
+	@echo "Building $@"
+	@mkdir -p $(@D)
+	@$(CXX) $^ -shared -o $@
+
+build/%.o: %.cc
+	@echo "Building $@"
+	@mkdir -p $(@D)
+	@$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
+clean:
+	@echo "Cleaning"
+	@$(RM) -r bin build lib
