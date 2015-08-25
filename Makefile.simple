@@ -25,6 +25,8 @@ override LDLIBS   +=
 
 .SECONDARY:
 
+include PrettyPrint.inc
+
 # Find the source files that will be used.
 EXE_SRC_FILES = $(wildcard *.cc)
 EXECUTABLES = $(patsubst %.cc,bin/%,$(EXE_SRC_FILES))
@@ -38,14 +40,12 @@ override CPPFLAGS += -MMD
 -include $(shell find build -name "*.d" 2> /dev/null)
 
 bin/%: build/%.o $(O_FILES)
-	@echo "Building $@"
 	@mkdir -p bin
-	@$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+	@$(call run_and_test,$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@)
 
 build/%.o: %.cc
-	@echo "Building $@"
 	@mkdir -p $(@D)
-	@$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+	@$(call run_and_test,$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@)
 
 clean:
 	@echo "Cleaning"

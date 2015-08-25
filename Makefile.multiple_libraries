@@ -34,6 +34,8 @@ override LDLIBS   +=
 .SECONDARY:
 .SECONDEXPANSION:
 
+include PrettyPrint.inc
+
 # Find each library to be made.
 LIBRARY_FOLDERS   = $(wildcard lib?*)
 LIBRARY_OUTPUT    = $(patsubst %,lib/%.so,$(LIBRARY_FOLDERS))
@@ -57,14 +59,12 @@ override CPPFLAGS += -MMD
 -include $(shell find build -name "*.d" 2> /dev/null)
 
 bin/%: build/%.o $(O_FILES) | $(LIBRARY_OUTPUT)
-	@echo "Building $@"
 	@mkdir -p $(@D)
-	@$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+	@$(call run_and_test,$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@)
 
 build/%.o: %.cc
-	@echo "Building $@"
 	@mkdir -p $(@D)
-	@$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+	@$(call run_and_test,$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@)
 
 
 define library_variables
@@ -82,9 +82,8 @@ endef
 $(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_variables,$(lib))))
 
 lib/lib%.so: $$(call library_o_files,%)
-	@echo "Building $@"
 	@mkdir -p $(@D)
-	@$(CXX) $(LDFLAGS) $^ -shared $(SHARED_LDLIBS) -o $@
+	@$(call run_and_test,$(CXX) $(LDFLAGS) $^ -shared $(SHARED_LDLIBS) -o $@)
 
 clean:
 	@echo "Cleaning"
