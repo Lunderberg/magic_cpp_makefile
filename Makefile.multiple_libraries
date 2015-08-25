@@ -61,15 +61,30 @@ bin/%: build/%.o $(O_FILES) | $(LIBRARY_OUTPUT)
 	@mkdir -p $(@D)
 	@$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-lib/lib%.so: $$(call library_o_files,%)
-	@echo "Building $@"
-	@mkdir -p $(@D)
-	@$(CXX) $^ -shared -o $@
-
 build/%.o: %.cc
 	@echo "Building $@"
 	@mkdir -p $(@D)
 	@$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
+
+define library_variables
+CPPFLAGS_EXTRA =
+CXXFLAGS_EXTRA =
+LDFLAGS_EXTRA  =
+SHARED_LDLIBS  =
+-include $(1)/Makefile.inc
+build/$(1)/%.o: override CPPFLAGS := $$(CPPFLAGS) $$(CPPFLAGS_EXTRA)
+build/$(1)/%.o: override CXXFLAGS := $$(CXXFLAGS) $$(CXXFLAGS_EXTRA)
+lib/$(1).so:  override LDFLAGS  := $$(LDFLAGS)  $$(LDFLAGS_EXTRA)
+lib/$(1).so:  override SHARED_LDLIBS := $$(SHARED_LDLIBS)
+endef
+
+$(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_variables,$(lib))))
+
+lib/lib%.so: $$(call library_o_files,%)
+	@echo "Building $@"
+	@mkdir -p $(@D)
+	@$(CXX) $(LDFLAGS) $^ -shared $(SHARED_LDLIBS) -o $@
 
 clean:
 	@echo "Cleaning"
