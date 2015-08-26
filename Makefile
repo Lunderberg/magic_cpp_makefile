@@ -20,6 +20,11 @@ CXXFLAGS = -g -O3
 LDFLAGS  =
 LDLIBS   =
 RM       = rm -f
+BUILD    = default
+
+ifneq ($(BUILD),default)
+    include build-targets/$(BUILD).inc
+endif
 
 # Additional flags that are necessary to compile.
 # Even if not specified on the command line, these should be present.
@@ -33,8 +38,15 @@ override LDLIBS   +=
 
 .SECONDARY:
 .SECONDEXPANSION:
+.PHONY: all clean force
 
 include PrettyPrint.inc
+
+# Find the source files that will be used.
+EXE_SRC_FILES = $(wildcard *.cc)
+EXECUTABLES = $(patsubst %.cc,bin/%,$(EXE_SRC_FILES))
+SRC_FILES = $(wildcard src/*.cc)
+O_FILES = $(patsubst %.cc,build/$(BUILD)/build/%.o,$(SRC_FILES))
 
 # Find each library to be made.
 LIBRARY_FOLDERS   = $(wildcard lib?*)
@@ -44,27 +56,33 @@ override CPPFLAGS += $(LIBRARY_INCLUDES)
 LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(LIBRARY_FOLDERS))
 override LDLIBS   += $(LIBRARY_FLAGS)
 library_src_files = $(wildcard lib$(1)/src/*.cc)
-library_o_files   = $(patsubst %.cc,build/%.o,$(call library_src_files,$(1)))
-
-# Find the source files that will be used.
-EXE_SRC_FILES = $(wildcard *.cc)
-EXECUTABLES = $(patsubst %.cc,bin/%,$(EXE_SRC_FILES))
-SRC_FILES = $(wildcard src/*.cc)
-O_FILES = $(patsubst %.cc,build/%.o,$(SRC_FILES))
+library_o_files   = $(patsubst %.cc,build/$(BUILD)/build/%.o,$(call library_src_files,$(1)))
 
 all: $(EXECUTABLES) $(LIBRARY_OUTPUT)
+	@printf "%b" "$(DGREEN)Compilation successful$(NO_COLOR)\n"
 
 # Update dependencies with each compilation
 override CPPFLAGS += -MMD
 -include $(shell find build -name "*.d" 2> /dev/null)
 
-bin/%: build/%.o $(O_FILES) | $(LIBRARY_OUTPUT)
-	@mkdir -p $(@D)
-	@$(call run_and_test,$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@)
+.build-target: force
+	@echo $(BUILD) | cmp -s - $@ || echo $(BUILD) > $@
 
-build/%.o: %.cc
+bin/%: build/$(BUILD)/bin/% .build-target
 	@mkdir -p $(@D)
-	@$(call run_and_test,$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@)
+	@$(call run_and_test,cp -f $< $@,Copying  )
+
+lib/%: build/$(BUILD)/lib/% .build-target
+	@mkdir -p $(@D)
+	@$(call run_and_test,cp -f $< $@,Copying  )
+
+build/$(BUILD)/bin/%: build/$(BUILD)/build/%.o $(O_FILES) | $(LIBRARY_OUTPUT)
+	@mkdir -p $(@D)
+	@$(call run_and_test,$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@,Linking  )
+
+build/$(BUILD)/build/%.o: %.cc
+	@mkdir -p $(@D)
+	@$(call run_and_test,$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@,Compiling)
 
 
 define library_variables
@@ -81,10 +99,10 @@ endef
 
 $(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_variables,$(lib))))
 
-lib/lib%.so: $$(call library_o_files,%)
+build/$(BUILD)/lib/lib%.so: $$(call library_o_files,%)
 	@mkdir -p $(@D)
-	@$(call run_and_test,$(CXX) $(LDFLAGS) $^ -shared $(SHARED_LDLIBS) -o $@)
+	@$(call run_and_test,$(CXX) $(LDFLAGS) $^ -shared $(SHARED_LDLIBS) -o $@,Linking  )
 
 clean:
-	@echo "Cleaning"
-	@$(RM) -r bin build lib
+	@printf "%b" "$(DYELLOW)Cleaning$(NO_COLOR)\n"
+	@$(RM) -r bin build lib .build-target
