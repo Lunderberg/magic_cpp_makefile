@@ -42,11 +42,16 @@ WARN_STRING  = "[WARNING]"
 
 ifdef VERBOSE
 
-    run_and_test = echo "$(1)" && $(1)
+    define run_and_test
+        echo "$(1)"
+        mkdir -p $(@D)
+        $(1)
+    endef
 
 else
 
     define run_and_test
+        mkdir -p $(@D)
         printf "%b" "$(COM_COLOR)$(2) $(OBJ_COLOR)$(@F)$(NO_COLOR)\r"; \
         $(1) 2> $@.log; \
         RESULT=$$?; \
