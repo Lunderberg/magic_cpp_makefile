@@ -15,6 +15,7 @@
 # Default build variables, can be overridden by command line options.
 
 CXX      = g++
+AR       = ar
 CPPFLAGS =
 CXXFLAGS = -g -O3
 LDFLAGS  =
