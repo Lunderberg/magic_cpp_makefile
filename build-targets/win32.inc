@@ -12,6 +12,6 @@ STATIC_LIBRARY_NAME = $(patsubst lib%,lib/%.dll.a,$(1))
 PIC_FLAG = # Because g++ complains about the flag when it is a win32 target.
 
 LDFLAGS_EXTRA = -Lbin
-ifeq ($(shell test $(BUILD_STATIC) -gt $(BUILD_SHARED); echo $$?),0)
-  LDFLAGS_EXTRA += -static
+ifeq ($(LINK_AGAINST_STATIC),1)
+  LDFLAGS_EXTRA += -static -Llib
 endif

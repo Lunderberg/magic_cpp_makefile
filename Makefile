@@ -36,6 +36,7 @@ RM       = rm -f
 BUILD_SHARED = 1
 BUILD_STATIC = 0
 
+
 # More build variables, can be modified in build-target
 
 CPPFLAGS_EXTRA = -Iinclude
@@ -43,9 +44,13 @@ CXXFLAGS_EXTRA =
 LDFLAGS_EXTRA  = -Llib -Wl,-rpath,\$$ORIGIN/../lib -Wl,--no-as-needed
 LDLIBS_EXTRA   =
 PIC_FLAG = -fPIC
+CPP_EXT = cc
 
 SHARED_LIBRARY_NAME = $(patsubst %,lib/%.so,$(1))
 STATIC_LIBRARY_NAME = $(patsubst %,lib/%.a,$(1))
+
+# Will be 1 if the executables will be linking against a static library.
+LINK_AGAINST_STATIC = $(shell test $(BUILD_SHARED) -gt $(BUILD_STATIC); echo $$?)
 
 EXE_NAME     = bin/$(1)
 
@@ -70,19 +75,21 @@ ALL_LDLIBS   = $(LDLIBS)   $(LDLIBS_EXTRA)
 include PrettyPrint.inc
 
 # Find the source files that will be used.
-EXE_SRC_FILES = $(wildcard *.cc)
+EXE_SRC_FILES = $(wildcard *.$(CPP_EXT))
 EXECUTABLES = $(foreach cc,$(EXE_SRC_FILES),$(call EXE_NAME,$(basename $(cc))))
-SRC_FILES = $(wildcard src/*.cc)
-O_FILES = $(patsubst %.cc,build/$(BUILD)/build/%.o,$(SRC_FILES))
+SRC_FILES = $(wildcard src/*.$(CPP_EXT))
+O_FILES = $(patsubst %.$(CPP_EXT),build/$(BUILD)/build/%.o,$(SRC_FILES))
 
 # Find each library to be made.
 LIBRARY_FOLDERS   = $(wildcard lib?*)
 LIBRARY_INCLUDES  = $(patsubst %,-I%/include,$(LIBRARY_FOLDERS))
 ALL_CPPFLAGS     += $(LIBRARY_INCLUDES)
 LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(LIBRARY_FOLDERS))
-ALL_LDLIBS       += $(LIBRARY_FLAGS)
-library_src_files = $(wildcard lib$(1)/src/*.cc)
-library_o_files   = $(patsubst %.cc,build/$(BUILD)/build/%.o,$(call library_src_files,$(1)))
+ifneq ($(LINK_AGAINST_STATIC),1)
+    ALL_LDLIBS       += $(LIBRARY_FLAGS)
+endif
+library_src_files = $(wildcard lib$(1)/src/*.$(CPP_EXT))
+library_o_files   = $(patsubst %.$(CPP_EXT),build/$(BUILD)/build/%.o,$(call library_src_files,$(1)))
 library_os_files   = $(addsuffix s,$(call library_o_files,$(1)))
 
 ifneq ($(BUILD_STATIC),0)
@@ -112,7 +119,7 @@ $(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%
 $(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
-ifeq ($(shell test $(BUILD_SHARED) -gt $(BUILD_STATIC); echo $$?),0)
+ifeq ($(LINK_AGAINST_STATIC),0)
 build/$(BUILD)/$(call EXE_NAME,%): build/$(BUILD)/build/%.o $(O_FILES) | $(SHARED_LIBRARY_OUTPUT)
 	@$(call run_and_test,$(CXX) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@,Linking  )
 else
@@ -120,10 +127,10 @@ build/$(BUILD)/$(call EXE_NAME,%): build/$(BUILD)/build/%.o $(O_FILES) $(STATIC_
 	@$(call run_and_test,$(CXX) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@,Linking  )
 endif
 
-build/$(BUILD)/build/%.o: %.cc
+build/$(BUILD)/build/%.o: %.$(CPP_EXT)
 	@$(call run_and_test,$(CXX) -c $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) $< -o $@,Compiling)
 
-build/$(BUILD)/build/%.os: %.cc
+build/$(BUILD)/build/%.os: %.$(CPP_EXT)
 	@$(call run_and_test,$(CXX) -c $(PIC_FLAG) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) $< -o $@,Compiling)
 
 
