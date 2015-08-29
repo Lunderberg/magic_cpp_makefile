@@ -94,9 +94,9 @@ LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(LIBRARY_FOLDERS))
 ifneq ($(LINK_AGAINST_STATIC),1)
     ALL_LDLIBS       += $(LIBRARY_FLAGS)
 endif
-library_src_files = $(call find_in_dir,lib$(1)/src/,$(CPP_EXT) $(C_EXT))
-library_o_files   = $(call o_file_name,$(call library_src_files,$(1)))
-library_os_files   = $(addsuffix s,$(call library_o_files,$(1)))
+library_src_files = $(foreach src_dir,$(2),$(call find_in_dir,$(1)/$(src_dir),$(CPP_EXT) $(C_EXT)))
+library_o_files   = $(call o_file_name,$(call library_src_files,$(1),$(2)))
+library_os_files   = $(addsuffix s,$(call library_o_files,$(1),$(2)))
 
 ifneq ($(BUILD_STATIC),0)
     STATIC_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call STATIC_LIBRARY_NAME,$(lib)))
@@ -155,27 +155,35 @@ endef
 $(foreach ext,$(C_EXT),$(eval $(call C_BUILD_RULES,$(ext))))
 
 
-define library_variables
-CPPFLAGS_LIB =
-CFLAGS_LIB =
-CXXFLAGS_LIB =
-LDFLAGS_LIB  =
-SHARED_LDLIBS  =
--include $(1)/Makefile.inc
-build/$(1)/%.o: ALL_CPPFLAGS := $$(ALL_CPPFLAGS) $$(CPPFLAGS_LIB)
-build/$(1)/%.o: ALL_CFLAGS := $$(ALL_CFLAGS) $$(CFLAGS_LIB)
-build/$(1)/%.o: ALL_CXXFLAGS := $$(ALL_CXXFLAGS) $$(CXXFLAGS_LIB)
-lib/$(1).so:  ALL_LDFLAGS  := $$(ALL_LDFLAGS)  $$(LDFLAGS_LIB)
-lib/$(1).so:  SHARED_LDLIBS := $$(SHARED_LDLIBS)
+define library_commands
+
+    ifneq ($$(BUILD_STATIC),0)
+       STATIC_LIBRARY := $$(call STATIC_LIBRARY_NAME,$(1))
+    else
+       STATIC_LIBRARY :=
+    endif
+
+    ifneq ($$(BUILD_SHARED),0)
+       SHARED_LIBRARY := $$(call SHARED_LIBRARY_NAME,$(1))
+    else
+       SHARED_LIBRARY :=
+    endif
+
+    LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
+    LIBRARY_SRC_DIRS = src
+
+    -include $(1)/Makefile.inc
+
+    build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$(1)): $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))
+	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ -shared $$(SHARED_LDLIBS) -o $$@,Linking  )
+
+    build/$$(BUILD)/$$(call STATIC_LIBRARY_NAME,$(1)): $$(call library_o_files,$(1),$$(LIBRARY_SRC_DIRS))
+	@$$(call run_and_test,$$(AR) rcs $$@ $$^,Linking  )
 endef
 
-$(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_variables,$(lib))))
+$(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_commands,$(lib))))
 
-build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%): $$(call library_os_files,%)
-	@$(call run_and_test,$(CXX) $(ALL_LDFLAGS) $^ -shared $(SHARED_LDLIBS) -o $@,Linking  )
 
-build/$(BUILD)/$(call STATIC_LIBRARY_NAME,lib%): $$(call library_o_files,%)
-	@$(call run_and_test,$(AR) rcs $@ $^,Linking  )
 
 clean:
 	@printf "%b" "$(DYELLOW)Cleaning$(NO_COLOR)\n"
