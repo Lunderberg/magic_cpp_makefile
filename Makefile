@@ -22,7 +22,7 @@ located in include, and source files containing
 "int main()" are in the main directory.
 
   Additional description of the behavior of the
-makefile can be found in "default.inc".
+makefile can be found in "default.inc"
 endef #WELCOME_MESSAGE
 
 define DEFAULT_INC_CONTENTS
@@ -52,6 +52,20 @@ LDFLAGS  =
 
 # Flags to be passed to the linker, after the listing of object files.
 LDLIBS   =
+
+# A list of directories containing source files containing "int
+# main()".  Each file will be compiled into a separate executable.
+EXE_DIRECTORIES = .
+
+# A list of directories containing other source files.  Each file will
+# be compiled, with the resulting source file being linked into each
+# executable.
+SRC_DIRECTORIES = src
+
+# A list of directories that contain libraries.  The list can also
+# contain patterns that expand to directories that contain libraries.
+# Each library is ex
+LIB_DIRECTORIES = lib?*
 
 # If BUILD_SHARED is non-zero, shared libraries will be generated.  If
 # BUILD_SHARED is greater than BUILD_STATIC, executables will be
@@ -143,6 +157,7 @@ ifeq (,$(wildcard default.inc))
     $(error $(WELCOME_MESSAGE))
 endif
 
+# Include the configuration file.
 BUILD = default
 include default.inc
 
@@ -152,50 +167,44 @@ ifneq ($(BUILD),default)
     include build-targets/$(BUILD).inc
 endif
 
-# Additional flags that are necessary to compile.
-# Even if not specified on the command line, these should be present.
-
+# Merge the mandatory and the optional flags.
 ALL_CPPFLAGS = $(CPPFLAGS) $(CPPFLAGS_EXTRA)
 ALL_CXXFLAGS = $(CXXFLAGS) $(CXXFLAGS_EXTRA)
 ALL_CFLAGS   = $(CFLAGS)   $(CFLAGS_EXTRA)
 ALL_LDFLAGS  = $(LDFLAGS)  $(LDFLAGS_EXTRA)
 ALL_LDLIBS   = $(LDLIBS)   $(LDLIBS_EXTRA)
 
-# EVERYTHING PAST HERE SHOULD WORK AUTOMATICALLY
-
 .SECONDARY:
-.SECONDEXPANSION:
 .PHONY: all clean force
 
 include PrettyPrint.inc
 
-find_in_dir = $(foreach ext,$(2),$(wildcard $(1)/*.$(ext)))
-o_file_name = $(foreach file,$(1),build/$(BUILD)/build/$(basename $(file)).o)
+find_in_dir  = $(foreach ext,$(2),$(wildcard $(1)/*.$(ext)))
+find_in_dirs = $(foreach dir,$(1),$(call find_in_dir,$(dir),$(2)))
+o_file_name  = $(foreach file,$(1),build/$(BUILD)/build/$(basename $(file)).o)
 
 # Find the source files that will be used.
-EXE_SRC_FILES = $(call find_in_dir,.,$(CPP_EXT) $(C_EXT))
-EXECUTABLES = $(foreach cc,$(EXE_SRC_FILES),$(call EXE_NAME,$(basename $(cc))))
-SRC_FILES = $(call find_in_dir,src/,$(CPP_EXT) $(C_EXT))
+EXE_SRC_FILES = $(call find_in_dirs,$(EXE_DIRECTORIES),$(CPP_EXT) $(C_EXT))
+EXECUTABLES = $(foreach cc,$(EXE_SRC_FILES),$(call EXE_NAME,$(basename $(notdir $(cc)))))
+SRC_FILES = $(call find_in_dirs,$(SRC_DIRECTORIES),$(CPP_EXT) $(C_EXT))
 O_FILES = $(call o_file_name,$(SRC_FILES))
 
 # Find each library to be made.
-LIBRARY_FOLDERS   = $(wildcard lib?*)
-LIBRARY_INCLUDES  = $(patsubst %,-I%/include,$(LIBRARY_FOLDERS))
-ALL_CPPFLAGS     += $(LIBRARY_INCLUDES)
-LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(LIBRARY_FOLDERS))
+LIBRARY_FOLDERS   = $(foreach lib,$(LIB_DIRECTORIES),$(wildcard $(lib)))
+LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(notdir $(LIBRARY_FOLDERS)))
 ifneq ($(LINK_AGAINST_STATIC),1)
     ALL_LDLIBS       += $(LIBRARY_FLAGS)
 endif
-library_src_files = $(foreach src_dir,$(2),$(call find_in_dir,$(1)/$(src_dir),$(CPP_EXT) $(C_EXT)))
+library_src_files = $(call find_in_dirs,$(addprefix $(1)/,$(2)),$(CPP_EXT) $(C_EXT))
 library_o_files   = $(call o_file_name,$(call library_src_files,$(1),$(2)))
 library_os_files   = $(addsuffix s,$(call library_o_files,$(1),$(2)))
 
 ifneq ($(BUILD_STATIC),0)
-    STATIC_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call STATIC_LIBRARY_NAME,$(lib)))
+    STATIC_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call STATIC_LIBRARY_NAME,$(notdir $(lib))))
 endif
 
 ifneq ($(BUILD_SHARED),0)
-    SHARED_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call SHARED_LIBRARY_NAME,$(lib)))
+    SHARED_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call SHARED_LIBRARY_NAME,$(notdir $(lib))))
 endif
 
 all: default.inc $(EXECUTABLES) $(STATIC_LIBRARY_OUTPUT) $(SHARED_LIBRARY_OUTPUT)
@@ -208,34 +217,65 @@ ALL_CPPFLAGS += -MMD
 .build-target: force
 	@echo $(BUILD) | cmp -s - $@ || echo $(BUILD) > $@
 
+
+# Rules to build each executable
 $(call EXE_NAME,%): build/$(BUILD)/$(call EXE_NAME,%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
+define exe_rules
+  ifeq ($$(LINK_AGAINST_STATIC),0)
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) | $$(SHARED_LIBRARY_OUTPUT)
+	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
+  else
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(STATIC_LIBRARY_OUTPUT)
+	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
+  endif
+endef
+
+$(foreach dir,$(EXE_DIRECTORIES),$(eval $(call exe_rules,$(dir))))
+
+
+# Rules to build each library.
 $(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
-$(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,lib%) .build-target
+$(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(notdir $(1))/$(call STATIC_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
-ifeq ($(LINK_AGAINST_STATIC),0)
-build/$(BUILD)/$(call EXE_NAME,%): build/$(BUILD)/build/%.o $(O_FILES) | $(SHARED_LIBRARY_OUTPUT)
-	@$(call run_and_test,$(CXX) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@,Linking  )
-else
-build/$(BUILD)/$(call EXE_NAME,%): build/$(BUILD)/build/%.o $(O_FILES) $(STATIC_LIBRARY_OUTPUT)
-	@$(call run_and_test,$(CXX) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@,Linking  )
-endif
+define library_commands
+  ifneq ($$(BUILD_STATIC),0)
+    STATIC_LIBRARY := $$(call STATIC_LIBRARY_NAME,$(1))
+  else
+    STATIC_LIBRARY :=
+  endif
 
-define CPP_BUILD_RULES
-build/$$(BUILD)/build/%.o: %.$(1)
-	@$$(call run_and_test,$$(CXX) -c $$(ALL_CPPFLAGS) $$(ALL_CXXFLAGS) $$< -o $$@,Compiling)
+  ifneq ($$(BUILD_SHARED),0)
+    SHARED_LIBRARY := $$(call SHARED_LIBRARY_NAME,$(1))
+  else
+    SHARED_LIBRARY :=
+  endif
 
-build/$$(BUILD)/build/%.os: %.$(1)
-	@$$(call run_and_test,$$(CXX) -c $$(PIC_FLAG) $$(ALL_CPPFLAGS) $$(ALL_CXXFLAGS) $$< -o $$@,Compiling)
+  LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
+  LIBRARY_SRC_DIRS = src
+  LIBRARY_INC_DIRS = include
+
+  -include $(1)/Makefile.inc
+
+  ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_INC_DIRS))
+
+  build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$(notdir $(1))): \
+                           $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))
+	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ -shared $$(SHARED_LDLIBS) -o $$@,Linking  )
+
+  build/$$(BUILD)/$$(call STATIC_LIBRARY_NAME,$(notdir $(1))): \
+                           $$(call library_o_files,$(1),$$(LIBRARY_SRC_DIRS))
+	@$$(call run_and_test,$$(AR) rcs $$@ $$^,Linking  )
 endef
 
-$(foreach ext,$(CPP_EXT),$(eval $(call CPP_BUILD_RULES,$(ext))))
+$(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_commands,$(lib))))
 
 
+# Rules to build object files from C code
 define C_BUILD_RULES
 build/$$(BUILD)/build/%.o: %.$(1)
 	@$$(call run_and_test,$$(CC) -c $$(ALL_CPPFLAGS) $$(ALL_CFLAGS) $$< -o $$@,Compiling)
@@ -247,36 +287,18 @@ endef
 $(foreach ext,$(C_EXT),$(eval $(call C_BUILD_RULES,$(ext))))
 
 
-define library_commands
+# Rules to build object files from C++ code
+define CPP_BUILD_RULES
+build/$$(BUILD)/build/%.o: %.$(1)
+	@$$(call run_and_test,$$(CXX) -c $$(ALL_CPPFLAGS) $$(ALL_CXXFLAGS) $$< -o $$@,Compiling)
 
-    ifneq ($$(BUILD_STATIC),0)
-       STATIC_LIBRARY := $$(call STATIC_LIBRARY_NAME,$(1))
-    else
-       STATIC_LIBRARY :=
-    endif
-
-    ifneq ($$(BUILD_SHARED),0)
-       SHARED_LIBRARY := $$(call SHARED_LIBRARY_NAME,$(1))
-    else
-       SHARED_LIBRARY :=
-    endif
-
-    LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
-    LIBRARY_SRC_DIRS = src
-
-    -include $(1)/Makefile.inc
-
-    build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$(1)): $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))
-	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ -shared $$(SHARED_LDLIBS) -o $$@,Linking  )
-
-    build/$$(BUILD)/$$(call STATIC_LIBRARY_NAME,$(1)): $$(call library_o_files,$(1),$$(LIBRARY_SRC_DIRS))
-	@$$(call run_and_test,$$(AR) rcs $$@ $$^,Linking  )
+build/$$(BUILD)/build/%.os: %.$(1)
+	@$$(call run_and_test,$$(CXX) -c $$(PIC_FLAG) $$(ALL_CPPFLAGS) $$(ALL_CXXFLAGS) $$< -o $$@,Compiling)
 endef
 
-$(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_commands,$(lib))))
+$(foreach ext,$(CPP_EXT),$(eval $(call CPP_BUILD_RULES,$(ext))))
 
-
-
+# Cleanup
 clean:
 	@printf "%b" "$(DYELLOW)Cleaning$(NO_COLOR)\n"
 	@$(RM) -r bin build lib .build-target

@@ -1,6 +1,6 @@
-# Define all the colors I'll need
+# Define all the ANSI color codes I'll need
 
-NO_COLOR   = \033[m
+RESET_COLOR   = \033[m
 
 BLUE       = \033[1;34m
 YELLOW     = \033[1;33m
@@ -35,6 +35,7 @@ OBJ_COLOR   = $(DCYAN)
 OK_COLOR    = $(DGREEN)
 ERROR_COLOR = $(DRED)
 WARN_COLOR  = $(DYELLOW)
+NO_COLOR    = $(RESET_COLOR)
 
 OK_STRING    = "[OK]"
 ERROR_STRING = "[ERROR]"
