@@ -44,7 +44,9 @@ CXXFLAGS_EXTRA =
 LDFLAGS_EXTRA  = -Llib -Wl,-rpath,\$$ORIGIN/../lib -Wl,--no-as-needed
 LDLIBS_EXTRA   =
 PIC_FLAG = -fPIC
-CPP_EXT = cc
+
+C_EXT   = c
+CPP_EXT = C cc cpp cxx c++ cp
 
 SHARED_LIBRARY_NAME = $(patsubst %,lib/%.so,$(1))
 STATIC_LIBRARY_NAME = $(patsubst %,lib/%.a,$(1))
@@ -63,6 +65,7 @@ endif
 
 ALL_CPPFLAGS = $(CPPFLAGS) $(CPPFLAGS_EXTRA)
 ALL_CXXFLAGS = $(CXXFLAGS) $(CXXFLAGS_EXTRA)
+ALL_CFLAGS   = $(CFLAGS)   $(CFLAGS_EXTRA)
 ALL_LDFLAGS  = $(LDFLAGS)  $(LDFLAGS_EXTRA)
 ALL_LDLIBS   = $(LDLIBS)   $(LDLIBS_EXTRA)
 
@@ -74,11 +77,14 @@ ALL_LDLIBS   = $(LDLIBS)   $(LDLIBS_EXTRA)
 
 include PrettyPrint.inc
 
+find_in_dir = $(foreach ext,$(2),$(wildcard $(1)/*.$(ext)))
+o_file_name = $(foreach file,$(1),build/$(BUILD)/build/$(basename $(file)).o)
+
 # Find the source files that will be used.
-EXE_SRC_FILES = $(wildcard *.$(CPP_EXT))
+EXE_SRC_FILES = $(call find_in_dir,.,$(CPP_EXT) $(C_EXT))
 EXECUTABLES = $(foreach cc,$(EXE_SRC_FILES),$(call EXE_NAME,$(basename $(cc))))
-SRC_FILES = $(wildcard src/*.$(CPP_EXT))
-O_FILES = $(patsubst %.$(CPP_EXT),build/$(BUILD)/build/%.o,$(SRC_FILES))
+SRC_FILES = $(call find_in_dir,src/,$(CPP_EXT) $(C_EXT))
+O_FILES = $(call o_file_name,$(SRC_FILES))
 
 # Find each library to be made.
 LIBRARY_FOLDERS   = $(wildcard lib?*)
@@ -88,8 +94,8 @@ LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(LIBRARY_FOLDERS))
 ifneq ($(LINK_AGAINST_STATIC),1)
     ALL_LDLIBS       += $(LIBRARY_FLAGS)
 endif
-library_src_files = $(wildcard lib$(1)/src/*.$(CPP_EXT))
-library_o_files   = $(patsubst %.$(CPP_EXT),build/$(BUILD)/build/%.o,$(call library_src_files,$(1)))
+library_src_files = $(call find_in_dir,lib$(1)/src/,$(CPP_EXT) $(C_EXT))
+library_o_files   = $(call o_file_name,$(call library_src_files,$(1)))
 library_os_files   = $(addsuffix s,$(call library_o_files,$(1)))
 
 ifneq ($(BUILD_STATIC),0)
@@ -127,20 +133,37 @@ build/$(BUILD)/$(call EXE_NAME,%): build/$(BUILD)/build/%.o $(O_FILES) $(STATIC_
 	@$(call run_and_test,$(CXX) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@,Linking  )
 endif
 
-build/$(BUILD)/build/%.o: %.$(CPP_EXT)
-	@$(call run_and_test,$(CXX) -c $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) $< -o $@,Compiling)
+define CPP_BUILD_RULES
+build/$$(BUILD)/build/%.o: %.$(1)
+	@$$(call run_and_test,$$(CXX) -c $$(ALL_CPPFLAGS) $$(ALL_CXXFLAGS) $$< -o $$@,Compiling)
 
-build/$(BUILD)/build/%.os: %.$(CPP_EXT)
-	@$(call run_and_test,$(CXX) -c $(PIC_FLAG) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) $< -o $@,Compiling)
+build/$$(BUILD)/build/%.os: %.$(1)
+	@$$(call run_and_test,$$(CXX) -c $$(PIC_FLAG) $$(ALL_CPPFLAGS) $$(ALL_CXXFLAGS) $$< -o $$@,Compiling)
+endef
+
+$(foreach ext,$(CPP_EXT),$(eval $(call CPP_BUILD_RULES,$(ext))))
+
+
+define C_BUILD_RULES
+build/$$(BUILD)/build/%.o: %.$(1)
+	@$$(call run_and_test,$$(CC) -c $$(ALL_CPPFLAGS) $$(ALL_CFLAGS) $$< -o $$@,Compiling)
+
+build/$$(BUILD)/build/%.os: %.$(1)
+	@$$(call run_and_test,$$(CC) -c $$(PIC_FLAG) $$(ALL_CPPFLAGS) $$(ALL_CFLAGS) $$< -o $$@,Compiling)
+endef
+
+$(foreach ext,$(C_EXT),$(eval $(call C_BUILD_RULES,$(ext))))
 
 
 define library_variables
 CPPFLAGS_LIB =
+CFLAGS_LIB =
 CXXFLAGS_LIB =
 LDFLAGS_LIB  =
 SHARED_LDLIBS  =
 -include $(1)/Makefile.inc
 build/$(1)/%.o: ALL_CPPFLAGS := $$(ALL_CPPFLAGS) $$(CPPFLAGS_LIB)
+build/$(1)/%.o: ALL_CFLAGS := $$(ALL_CFLAGS) $$(CFLAGS_LIB)
 build/$(1)/%.o: ALL_CXXFLAGS := $$(ALL_CXXFLAGS) $$(CXXFLAGS_LIB)
 lib/$(1).so:  ALL_LDFLAGS  := $$(ALL_LDFLAGS)  $$(LDFLAGS_LIB)
 lib/$(1).so:  SHARED_LDLIBS := $$(SHARED_LDLIBS)
