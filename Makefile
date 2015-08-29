@@ -1,61 +1,153 @@
-# This is a makefile intended for compiling any C++ project.
+define WELCOME_MESSAGE
+default.inc not found, generating now
+-----------------------------------------------------
+|                                                   |
+|             Magic C/C++ Makefile                  |
+|                   - Eric Lunderberg               |
+|                                                   |
+-----------------------------------------------------
 
-# It assumes that you have one or more source files in the main directory,
-#    each of which contains an "int main()".
-# There may also be a "src" directory, containing additional source files.
-# All include files will be automatically listed as dependencies.
+  This is a makefile intended for compiling any
+C/C++ project.  It will find all source files,
+compile them appropriately into executables and
+libraries, and track all dependencies.
 
-# Any folders starting with "lib" will be compiled into libraries.
-# libMyLibrary should contain libMyLibrary/src and libMyLibrary/include
-# -IlibMyLibrary/include will be added to the compiler flags
-# All .cc files in libMyLibrary/src will be compiled into the library.
+  The makefile itself should not need to be
+modified.  A "default.inc" file has been generated,
+which contains many options for customizing the
+behavior of the makefile for your particular
+project.  The initial behavior assumes that most source
+files are located in src, include files are
+located in include, and source files containing
+"int main()" are in the main directory.
 
-# If BUILD_SHARED is non-zero, shared object libraries will be made.
-#    The default name is libMyLibrary.so
-# If BUILD_STATIC is non-zero, static object libraries will be made.
-#    The default name is libMyLibrary.a
-# If BUILD_STATIC has a greater value than BUILD_SHARED,
-#    the executables will be linked against the static libraries.
-# Otherwise, they will be linked against the shared libraries.
+  Additional description of the behavior of the
+makefile can be found in "default.inc".
+endef #WELCOME_MESSAGE
 
-
-# Standard build variables, can be overridden by command line options.
-
-BUILD    = default
-
+define DEFAULT_INC_CONTENTS
+# The C compiler to be used
 CC       = gcc
+
+# The C++ compiler to be used
 CXX      = g++
+
+# The archiver to be used
 AR       = ar
 
-CPPFLAGS =
-CXXFLAGS = -g -O3
-LDFLAGS  =
-LDLIBS   =
+# The command to remove files
 RM       = rm -f
 
+# Flags to be passed to both C and C++ code
+CPPFLAGS =
+
+# Flags to be passed to C code
+CFLAGS   =
+
+# Flags to be passed to C++ code
+CXXFLAGS = -g -O3
+
+# Flags to be passed to the linker, prior to listing of object files.
+LDFLAGS  =
+
+# Flags to be passed to the linker, after the listing of object files.
+LDLIBS   =
+
+# If BUILD_SHARED is non-zero, shared libraries will be generated.  If
+# BUILD_SHARED is greater than BUILD_STATIC, executables will be
+# linked against the shared libraries.
 BUILD_SHARED = 1
+
+# If BUILD_STATIC is non-zero, static libraries will be generated.  If
+# BUILD_STATIC is greater than BUILD_SHARED, executables will be
+# linked against the static libraries.
 BUILD_STATIC = 0
 
-
-# More build variables, can be modified in build-target
-
+# Mandatory arguments to both C and C++ compilers.  These arguments
+# will be passed even if CPPFLAGS has been overridden by command-line
+# arguments.
 CPPFLAGS_EXTRA = -Iinclude
+
+# Mandatory arguments to the C compiler.  These arguments will be
+# passed even if CFLAGS has been overriden by command-line arguments.
+CFLAGS_EXTRA =
+
+# Mandatory arguments to the C++ compiler.  These arguments will be
+# passed even if CXXFLAGS has been overridden by command-line arguments.
 CXXFLAGS_EXTRA =
+
+# Mandatory arguments to the linker, before the listing of object
+# files.  These arguments will be passed even if LDFLAGS has been
+# overridden by command-line arguments.
 LDFLAGS_EXTRA  = -Llib -Wl,-rpath,\$$ORIGIN/../lib -Wl,--no-as-needed
+
+# Mandatory arguments to the linker, after the listing of object
+# files.  These arguments will be passed even if LDLIBS has been
+# overridden by command-line arguments.
 LDLIBS_EXTRA   =
+
+# Flag to generate position-independent code.  This is passed to
+# object files being compiled to shared libraries, but not to any
+# other object files.
 PIC_FLAG = -fPIC
 
+# A space-delimited list of file extensions to be compiled as C code.
+# No element of this list should be present in CPP_EXT.
 C_EXT   = c
+
+# A space-delimited list of file extensions to be compiled as C++
+# code.  No element of this list should be present in C_EXT.
 CPP_EXT = C cc cpp cxx c++ cp
 
+# A function that, when given the name of a library, should return the
+# output file of a shared library.  For example, the default version,
+# when passed "libMyLibrary" as $(1), will return "lib/libMyLibrary.so".
 SHARED_LIBRARY_NAME = $(patsubst %,lib/%.so,$(1))
+
+# A function that, when given the name of a library, should return the
+# output file of a static library.  For example, the default version,
+# when passed "libMyLibrary" as $(1), will return "lib/libMyLibrary.a".
 STATIC_LIBRARY_NAME = $(patsubst %,lib/%.a,$(1))
 
-# Will be 1 if the executables will be linking against a static library.
+#   A macro to determine whether executables will be linked against
+# static libraries or shared libraries.  By default, will compile
+# against the shared libraries if BUILD_SHARED has a greater numeric
+# value than BUILD_STATIC, and will compile against the static
+# libraries otherwise.
+#   To always link against shared libraries, change this variable to
+# 0.  To always link against static libraries, change this variable to 1.
 LINK_AGAINST_STATIC = $(shell test $(BUILD_SHARED) -gt $(BUILD_STATIC); echo $$?)
 
+# A function that, given the base name of a source file, returns the
+# output filename of the executable.  For example, the default
+# version, when passed "MyProgram" as $(1), will return "bin/MyProgram".
 EXE_NAME     = bin/$(1)
 
+endef # DEFAULT_INC_CONTENTS
+
+# Needed to replace newline with \n prior to printing.
+define newline
+
+
+endef
+
+# Eval DEFAULT_INC_CONTENTS first.  This ensures that all required
+# variables are defined, even if the default.inc present is from an
+# older version of the makefile.
+$(eval $(DEFAULT_INC_CONTENTS))
+
+# If default.inc does not exist, create it and display the welcome
+# message.
+ifeq (,$(wildcard default.inc))
+    $(shell echo '$(subst $(newline),\n,$(value DEFAULT_INC_CONTENTS))' > default.inc)
+    $(error $(WELCOME_MESSAGE))
+endif
+
+BUILD = default
+include default.inc
+
+# If the BUILD variable has been defined from the command line,
+# include the appropriate build-target file.
 ifneq ($(BUILD),default)
     include build-targets/$(BUILD).inc
 endif
@@ -106,7 +198,7 @@ ifneq ($(BUILD_SHARED),0)
     SHARED_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call SHARED_LIBRARY_NAME,$(lib)))
 endif
 
-all: $(EXECUTABLES) $(STATIC_LIBRARY_OUTPUT) $(SHARED_LIBRARY_OUTPUT)
+all: default.inc $(EXECUTABLES) $(STATIC_LIBRARY_OUTPUT) $(SHARED_LIBRARY_OUTPUT)
 	@printf "%b" "$(DGREEN)Compilation successful$(NO_COLOR)\n"
 
 # Update dependencies with each compilation
