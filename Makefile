@@ -318,7 +318,7 @@ $(foreach dir,$(EXE_DIRECTORIES),$(eval $(call exe_rules,$(dir))))
 $(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
-$(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(notdir $(1))/$(call STATIC_LIBRARY_NAME,lib%) .build-target
+$(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
 define library_commands
