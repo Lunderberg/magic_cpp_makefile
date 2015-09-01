@@ -39,7 +39,7 @@ AR       = ar
 RM       = rm -f
 
 # Flags to be passed to both C and C++ code
-CPPFLAGS =
+CPPFLAGS = -Wall -Wextra -pedantic
 
 # Flags to be passed to C code
 CFLAGS   =
@@ -88,7 +88,7 @@ CFLAGS_EXTRA =
 
 # Mandatory arguments to the C++ compiler.  These arguments will be
 # passed even if CXXFLAGS has been overridden by command-line arguments.
-CXXFLAGS_EXTRA =
+CXXFLAGS_EXTRA = -std=c++11
 
 # Mandatory arguments to the linker, before the listing of object
 # files.  These arguments will be passed even if LDFLAGS has been
@@ -130,7 +130,7 @@ STATIC_LIBRARY_NAME = $(patsubst %,lib/%.a,$(1))
 # libraries otherwise.
 #   To always link against shared libraries, change this variable to
 # 0.  To always link against static libraries, change this variable to 1.
-LINK_AGAINST_STATIC = $(shell test $(BUILD_SHARED) -gt $(BUILD_STATIC); echo $$?)
+LINK_AGAINST_STATIC = $(shell test "$(BUILD_SHARED)" -gt "$(BUILD_STATIC)"; echo $$?)
 
 # A function that, given the base name of a source file, returns the
 # output filename of the executable.  For example, the default
@@ -140,6 +140,10 @@ EXE_NAME     = bin/$(1)
 # Determines whether the output is in color or not.  To disable
 # coloring, set this variable to 0.
 USE_COLOR = 1
+
+# Which system is the target system.  This may be used by library
+# targets to choose which system libraries to include.
+SYSTEM = native
 
 endef # DEFAULT_INC_CONTENTS
 
@@ -151,8 +155,9 @@ endef
 
 # Eval DEFAULT_INC_CONTENTS first.  This ensures that all required
 # variables are defined, even if the default.inc present is from an
-# older version of the makefile.
-$(eval $(DEFAULT_INC_CONTENTS))
+# older version of the makefile. This uses $(value ...) to avoid the
+# first expansion of variables.
+$(eval $(value DEFAULT_INC_CONTENTS))
 
 # If default.inc does not exist, create it and display the welcome
 # message.
@@ -169,6 +174,10 @@ include default.inc
 # include the appropriate build-target file.
 ifneq ($(BUILD),default)
     include build-targets/$(BUILD).inc
+endif
+
+ifeq ($(SYSTEM),native)
+  SYSTEM = $(shell uname)
 endif
 
 # Merge the mandatory and the optional flags.

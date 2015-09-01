@@ -15,3 +15,5 @@ LDFLAGS_EXTRA = -Lbin
 ifeq ($(LINK_AGAINST_STATIC),1)
   LDFLAGS_EXTRA += -static -Llib
 endif
+
+SYSTEM = windows
