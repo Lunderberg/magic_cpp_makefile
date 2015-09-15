@@ -145,6 +145,17 @@ EXE_NAME     = bin/$(1)
 # coloring, set this variable to 0.
 USE_COLOR = 1
 
+# The location to which extra resources should be installed.
+INSTALL_DEST =
+
+# Extra resources that should be copied to $(INSTALL_DEST).  These can
+# be either files or directories.
+INSTALL_RESOURCES =
+
+# A listing of the files and directories to be cleaned when running
+# "make clean".
+CLEAN_TARGETS = bin lib build
+
 # Which system is the target system.  This may be used by library
 # targets to choose which system libraries to include.
 SYSTEM = native
@@ -194,7 +205,7 @@ ALL_LDLIBS   = $(LDLIBS)   $(LDLIBS_EXTRA)
 ALL_CPPFLAGS += $(addprefix -I,$(INC_DIRECTORIES))
 
 .SECONDARY:
-.PHONY: all clean force
+.PHONY: all clean force install_resources
 
 # Define all the ANSI color codes I want as options.  If the USE_COLOR
 # variable is zero, then don't define any of the codes.
@@ -301,7 +312,7 @@ ifneq ($(BUILD_SHARED),0)
     SHARED_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call SHARED_LIBRARY_NAME,$(notdir $(lib))))
 endif
 
-all: default.inc $(EXECUTABLES) $(STATIC_LIBRARY_OUTPUT) $(SHARED_LIBRARY_OUTPUT)
+all: default.inc $(EXECUTABLES) $(STATIC_LIBRARY_OUTPUT) $(SHARED_LIBRARY_OUTPUT) install_resources
 	@printf "%b" "$(DGREEN)Compilation successful$(NO_COLOR)\n"
 
 # Update dependencies with each compilation
@@ -392,7 +403,23 @@ endef
 
 $(foreach ext,$(CPP_EXT),$(eval $(call CPP_BUILD_RULES,$(ext))))
 
+
+# Rules to install
+install_resources:
+
+define INSTALL_RULES
+$$(INSTALL_DEST)/%: $(dir $(abspath $(1)))/%
+	@$$(call run_and_test,cp $$< $$@,Copying  )
+
+INSTALL_SOURCES = $$(shell find $(abspath $(1)) -type f)
+install_resources: $$(patsubst $(dir $(abspath $(1)))%,$$(INSTALL_DEST)/%,$$(INSTALL_SOURCES))
+endef
+
+$(foreach source,$(INSTALL_RESOURCES),$(eval $(call INSTALL_RULES,$(source))))
+
+
+
 # Cleanup
 clean:
 	@printf "%b" "$(DYELLOW)Cleaning$(NO_COLOR)\n"
-	@$(RM) -r bin build lib .build-target
+	@$(RM) -r $(CLEAN_TARGETS) .build-target
