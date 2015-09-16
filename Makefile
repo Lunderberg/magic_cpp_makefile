@@ -160,6 +160,11 @@ CLEAN_TARGETS = bin lib build
 # targets to choose which system libraries to include.
 SYSTEM = native
 
+# The command to be run to run tests.  This command will be run when
+# running "make test".  If this variable is an empty string, then this
+# target will be left undefined.
+TEST_COMMAND =
+
 endef # DEFAULT_INC_CONTENTS
 
 # Needed to replace newline with \n prior to printing.
@@ -313,6 +318,12 @@ ALL_CPPFLAGS += -MMD
 .build-target: force
 	@echo $(BUILD) | cmp -s - $@ || echo $(BUILD) > $@
 
+
+ifneq ($(TEST_COMMAND),)
+  test: all
+	@echo "Running tests"
+	@$(TEST_COMMAND)
+endif
 
 # Rules to build each library.
 $(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%) .build-target
