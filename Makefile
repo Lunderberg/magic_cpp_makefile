@@ -196,16 +196,16 @@ ifeq ($(SYSTEM),native)
 endif
 
 # Merge the mandatory and the optional flags.
-ALL_CPPFLAGS = $(CPPFLAGS) $(CPPFLAGS_EXTRA)
-ALL_CXXFLAGS = $(CXXFLAGS) $(CXXFLAGS_EXTRA)
-ALL_CFLAGS   = $(CFLAGS)   $(CFLAGS_EXTRA)
-ALL_LDFLAGS  = $(LDFLAGS)  $(LDFLAGS_EXTRA)
-ALL_LDLIBS   = $(LDLIBS)   $(LDLIBS_EXTRA)
+ALL_CPPFLAGS := $(CPPFLAGS) $(CPPFLAGS_EXTRA)
+ALL_CXXFLAGS := $(CXXFLAGS) $(CXXFLAGS_EXTRA)
+ALL_CFLAGS   := $(CFLAGS)   $(CFLAGS_EXTRA)
+ALL_LDFLAGS  := $(LDFLAGS)  $(LDFLAGS_EXTRA)
+ALL_LDLIBS   := $(LDLIBS)   $(LDLIBS_EXTRA)
 
 ALL_CPPFLAGS += $(addprefix -I,$(INC_DIRECTORIES))
 
 .SECONDARY:
-.PHONY: all clean force install_resources
+.PHONY: all clean force install_resources executables libraries
 
 # Define all the ANSI color codes I want as options.  If the USE_COLOR
 # variable is zero, then don't define any of the codes.
@@ -289,8 +289,6 @@ find_in_dirs = $(foreach dir,$(1),$(call find_in_dir,$(dir),$(2)))
 o_file_name  = $(foreach file,$(1),build/$(BUILD)/build/$(basename $(file)).o)
 
 # Find the source files that will be used.
-EXE_SRC_FILES = $(call find_in_dirs,$(EXE_DIRECTORIES),$(CPP_EXT) $(C_EXT))
-EXECUTABLES = $(foreach cc,$(EXE_SRC_FILES),$(call EXE_NAME,$(basename $(notdir $(cc)))))
 SRC_FILES = $(call find_in_dirs,$(SRC_DIRECTORIES),$(CPP_EXT) $(C_EXT))
 O_FILES = $(call o_file_name,$(SRC_FILES))
 
@@ -304,15 +302,8 @@ library_src_files = $(call find_in_dirs,$(addprefix $(1)/,$(2)),$(CPP_EXT) $(C_E
 library_o_files   = $(call o_file_name,$(call library_src_files,$(1),$(2)))
 library_os_files   = $(addsuffix s,$(call library_o_files,$(1),$(2)))
 
-ifneq ($(BUILD_STATIC),0)
-    STATIC_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call STATIC_LIBRARY_NAME,$(notdir $(lib))))
-endif
 
-ifneq ($(BUILD_SHARED),0)
-    SHARED_LIBRARY_OUTPUT = $(foreach lib,$(LIBRARY_FOLDERS),$(call SHARED_LIBRARY_NAME,$(notdir $(lib))))
-endif
-
-all: default.inc $(EXECUTABLES) $(STATIC_LIBRARY_OUTPUT) $(SHARED_LIBRARY_OUTPUT) install_resources
+all: default.inc executables libraries install_resources
 	@printf "%b" "$(DGREEN)Compilation successful$(NO_COLOR)\n"
 
 # Update dependencies with each compilation
@@ -323,23 +314,6 @@ ALL_CPPFLAGS += -MMD
 	@echo $(BUILD) | cmp -s - $@ || echo $(BUILD) > $@
 
 
-# Rules to build each executable
-$(call EXE_NAME,%): build/$(BUILD)/$(call EXE_NAME,%) .build-target
-	@$(call run_and_test,cp -f $< $@,Copying  )
-
-define exe_rules
-  ifeq ($$(LINK_AGAINST_STATIC),0)
-    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) | $$(SHARED_LIBRARY_OUTPUT)
-	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
-  else
-    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(STATIC_LIBRARY_OUTPUT)
-	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
-  endif
-endef
-
-$(foreach dir,$(EXE_DIRECTORIES),$(eval $(call exe_rules,$(dir))))
-
-
 # Rules to build each library.
 $(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
@@ -347,22 +321,30 @@ $(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%
 $(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
+libraries:
+STATIC_LIBRARY_OUTPUT :=
+SHARED_LIBRARY_OUTPUT :=
+
 define library_commands
   ifneq ($$(BUILD_STATIC),0)
     STATIC_LIBRARY := $$(call STATIC_LIBRARY_NAME,$(1))
   else
     STATIC_LIBRARY :=
   endif
+  STATIC_LIBRARY_OUTPUT += $$(STATIC_LIBRARY)
 
   ifneq ($$(BUILD_SHARED),0)
     SHARED_LIBRARY := $$(call SHARED_LIBRARY_NAME,$(1))
   else
     SHARED_LIBRARY :=
   endif
+  SHARED_LIBRARY_OUTPUT += $$(SHARED_LIBRARY)
 
   LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
   LIBRARY_SRC_DIRS = src
   LIBRARY_INC_DIRS = include
+
+  libraries: $$(LIBRARY)
 
   -include $(1)/Makefile.inc
 
@@ -378,6 +360,29 @@ define library_commands
 endef
 
 $(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_commands,$(lib))))
+
+
+# Rules to build each executable
+$(call EXE_NAME,%): build/$(BUILD)/$(call EXE_NAME,%) .build-target
+	@$(call run_and_test,cp -f $< $@,Copying  )
+
+executables:
+
+define exe_rules
+  ifeq ($$(LINK_AGAINST_STATIC),0)
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) | $$(SHARED_LIBRARY_OUTPUT)
+	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
+  else
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(STATIC_LIBRARY_OUTPUT)
+	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
+  endif
+
+  EXE_SRC_FILES = $$(call find_in_dir,$(1),$$(CPP_EXT) $$(C_EXT))
+  EXECUTABLES = $$(foreach cc,$$(EXE_SRC_FILES),$$(call EXE_NAME,$$(basename $$(notdir $$(cc)))))
+  executables: $$(EXECUTABLES)
+endef
+
+$(foreach dir,$(EXE_DIRECTORIES),$(eval $(call exe_rules,$(dir))))
 
 
 # Rules to build object files from C code
