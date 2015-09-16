@@ -343,6 +343,7 @@ define library_commands
   LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
   LIBRARY_SRC_DIRS = src
   LIBRARY_INC_DIRS = include
+  CURDIR = $(1)
 
   libraries: $$(LIBRARY)
 
@@ -369,16 +370,23 @@ $(call EXE_NAME,%): build/$(BUILD)/$(call EXE_NAME,%) .build-target
 executables:
 
 define exe_rules
+  EXE_SRC_FILES = $$(call find_in_dir,$(1),$$(CPP_EXT) $$(C_EXT))
+  EXECUTABLES = $$(foreach cc,$$(EXE_SRC_FILES),$$(call EXE_NAME,$$(basename $$(notdir $$(cc)))))
+  EXTRA_SRC_FILES =
+  CURDIR = $(1)
+
+  -include $(1)/Makefile.inc
+
+  EXTRA_O_FILES = $$(call o_file_name,$$(EXTRA_SRC_FILES))
+
   ifeq ($$(LINK_AGAINST_STATIC),0)
-    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) | $$(SHARED_LIBRARY_OUTPUT)
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(EXTRA_O_FILES) | $$(SHARED_LIBRARY_OUTPUT)
 	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
   else
-    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(STATIC_LIBRARY_OUTPUT)
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(EXTRA_O_FILES) $$(STATIC_LIBRARY_OUTPUT)
 	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
   endif
 
-  EXE_SRC_FILES = $$(call find_in_dir,$(1),$$(CPP_EXT) $$(C_EXT))
-  EXECUTABLES = $$(foreach cc,$$(EXE_SRC_FILES),$$(call EXE_NAME,$$(basename $$(notdir $$(cc)))))
   executables: $$(EXECUTABLES)
 endef
 
