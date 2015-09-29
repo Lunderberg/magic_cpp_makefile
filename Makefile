@@ -312,7 +312,7 @@ all: default.inc executables libraries install_resources
 	@printf "%b" "$(DGREEN)Compilation successful$(NO_COLOR)\n"
 
 # Update dependencies with each compilation
-ALL_CPPFLAGS += -MMD
+ALL_CPPFLAGS += -MMD -MP
 -include $(shell find build -name "*.d" 2> /dev/null)
 
 .build-target: force
