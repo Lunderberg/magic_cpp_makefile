@@ -299,10 +299,6 @@ O_FILES = $(call o_file_name,$(SRC_FILES))
 
 # Find each library to be made.
 LIBRARY_FOLDERS   = $(foreach lib,$(LIB_DIRECTORIES),$(wildcard $(lib)))
-LIBRARY_FLAGS     = $(patsubst lib%,-l%,$(notdir $(LIBRARY_FOLDERS)))
-ifneq ($(LINK_AGAINST_STATIC),1)
-    ALL_LDLIBS       += $(LIBRARY_FLAGS)
-endif
 library_src_files = $(call find_in_dirs,$(addprefix $(1)/,$(2)),$(CPP_EXT) $(C_EXT))
 library_o_files   = $(call o_file_name,$(call library_src_files,$(1),$(2)))
 library_os_files   = $(addsuffix s,$(call library_o_files,$(1),$(2)))
@@ -327,7 +323,7 @@ endif
 
 # Rules to build each library.
 $(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%) .build-target
-	@$(call run_and_test,cp -f $< $@,Copying  )
+	@$(call run_and_test,cp --remove-destination $< $@,Copying  )
 
 $(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,lib%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
@@ -354,6 +350,7 @@ define library_commands
   LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
   LIBRARY_SRC_DIRS = src
   LIBRARY_INC_DIRS = include
+  LIBRARY_FLAG = $$(patsubst lib%,-l%,$$(notdir $(1)))
   CURDIR = $(1)
 
   libraries: $$(LIBRARY)
@@ -361,6 +358,7 @@ define library_commands
   -include $(1)/Makefile.inc
 
   ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_INC_DIRS))
+  ALL_LDLIBS += $$(LIBRARY_FLAG)
 
   build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$(notdir $(1))): \
                            $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))
