@@ -104,6 +104,10 @@ LDFLAGS_EXTRA  = -Llib -Wl,-rpath,\$$ORIGIN/../lib -Wl,--no-as-needed
 # overridden by command-line arguments.
 LDLIBS_EXTRA   =
 
+# Static libraries that should be linked into the executables.  The
+# order of libraries is the order of inclusion.
+EXTERNAL_STATIC_LIBS =
+
 # Flag to generate position-independent code.  This is passed to
 # object files being compiled to shared libraries, but not to any
 # other object files.
@@ -119,13 +123,13 @@ CPP_EXT = C cc cpp cxx c++ cp
 
 # A function that, when given the name of a library, should return the
 # output file of a shared library.  For example, the default version,
-# when passed "libMyLibrary" as $(1), will return "lib/libMyLibrary.so".
-SHARED_LIBRARY_NAME = $(patsubst %,lib/%.so,$(1))
+# when passed "MyLibrary" as $(1), will return "lib/libMyLibrary.so".
+SHARED_LIBRARY_NAME = lib/lib$(1).so
 
 # A function that, when given the name of a library, should return the
 # output file of a static library.  For example, the default version,
-# when passed "libMyLibrary" as $(1), will return "lib/libMyLibrary.a".
-STATIC_LIBRARY_NAME = $(patsubst %,lib/%.a,$(1))
+# when passed "MyLibrary" as $(1), will return "lib/libMyLibrary.a".
+STATIC_LIBRARY_NAME = lib/lib$(1).a
 
 #   A macro to determine whether executables will be linked against
 # static libraries or shared libraries.  By default, will compile
@@ -315,17 +319,45 @@ ALL_CPPFLAGS += -MMD -MP
 	@echo $(BUILD) | cmp -s - $@ || echo $(BUILD) > $@
 
 
-ifneq ($(TEST_COMMAND),)
-  test: all
-	@echo "Running tests"
-	@$(TEST_COMMAND)
-endif
+define SAMPLE_MAKEFILE_INC_CONTENTS
+# This file can be placed inside of a library directory to customize
+# the behavior of that library. Each option, if left commented, will
+# assumed its default value.
 
-# Rules to build each library.
-$(call SHARED_LIBRARY_NAME,lib%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,lib%) .build-target
+# The name of the library.
+# Defaults to LIBNAME, where libLIBNAME is the directory.
+LIBRARY_NAME = $(patsubst lib%,%,$(notdir $(CURDIR)))
+
+# The flag that will be passed to the include the library in
+# executables.
+LIBRARY_FLAG = -l$(LIBRARY_NAME)
+
+# The directories containing source files for the library.
+LIBRARY_SRC_DIRS = src
+
+# The directories containing include files for the library. These
+# directories will be added to the include path for all files in the
+# project.
+LIBRARY_INCLUDE_DIRS = include
+
+# The directories containing include files for the library.  These
+# directories will be added to the include path only for files within
+# this library
+LIBRARY_PRIVATE_INCLUDE_DIRS =
+
+# Compiler flag overrides for src files within this library.
+$(LIBRARY):
+endef
+
+LibMakefile.inc:
+	@echo '$(subst $(newline),\n,$(value SAMPLE_MAKEFILE_INC_CONTENTS))' > Makefile.inc
+	@echo "Constructed Makefile.inc.  Place this into a library directory to customize behavior"
+
+# Rules to copy each library into their final location.
+$(call SHARED_LIBRARY_NAME,%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,%) .build-target
 	@$(call run_and_test,cp --remove-destination $< $@,Copying  )
 
-$(call STATIC_LIBRARY_NAME,lib%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,lib%) .build-target
+$(call STATIC_LIBRARY_NAME,%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
 
 libraries:
@@ -333,44 +365,42 @@ STATIC_LIBRARY_OUTPUT :=
 SHARED_LIBRARY_OUTPUT :=
 
 define library_commands
-  ifneq ($$(BUILD_STATIC),0)
-    STATIC_LIBRARY := $$(call STATIC_LIBRARY_NAME,$(1))
-  else
-    STATIC_LIBRARY :=
-  endif
-  STATIC_LIBRARY_OUTPUT += $$(STATIC_LIBRARY)
-
-  ifneq ($$(BUILD_SHARED),0)
-    SHARED_LIBRARY := $$(call SHARED_LIBRARY_NAME,$(1))
-  else
-    SHARED_LIBRARY :=
-  endif
-  SHARED_LIBRARY_OUTPUT += $$(SHARED_LIBRARY)
-
-  LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
-  LIBRARY_SRC_DIRS = src
-  LIBRARY_INC_DIRS = include
-  LIBRARY_FLAG = $$(patsubst lib%,-l%,$$(notdir $(1)))
   CURDIR = $(1)
+  STATIC_LIBRARY = $$(call STATIC_LIBRARY_NAME,$$(LIBRARY_NAME))
+  SHARED_LIBRARY = $$(call SHARED_LIBRARY_NAME,$$(LIBRARY_NAME))
+  LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
 
-  libraries: $$(LIBRARY)
+  $$(eval $$(value SAMPLE_MAKEFILE_INC_CONTENTS))
 
   -include $(1)/Makefile.inc
 
-  ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_INC_DIRS))
+  STATIC_LIBRARY_OUTPUT += $$(STATIC_LIBRARY)
+  SHARED_LIBRARY_OUTPUT += $$(SHARED_LIBRARY)
+
+  ifeq ($$(BUILD_STATIC),0)
+    STATIC_LIBRARY :=
+  endif
+
+  ifeq ($$(BUILD_SHARED),0)
+    SHARED_LIBRARY :=
+  endif
+
+  libraries: $$(LIBRARY)
+  $$(LIBRARY): ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_PRIVATE_INCLUDE_DIRS))
+
+  ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_INCLUDE_DIRS))
   ALL_LDLIBS += $$(LIBRARY_FLAG)
 
-  build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$(notdir $(1))): \
-                           $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))
+  build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$$(LIBRARY_NAME)): \
+                          $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))
 	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ -shared $$(SHARED_LDLIBS) -o $$@,Linking  )
 
-  build/$$(BUILD)/$$(call STATIC_LIBRARY_NAME,$(notdir $(1))): \
+  build/$$(BUILD)/$$(call STATIC_LIBRARY_NAME,$$(LIBRARY_NAME)): \
                            $$(call library_o_files,$(1),$$(LIBRARY_SRC_DIRS))
 	@$$(call run_and_test,$$(AR) rcs $$@ $$^,Linking  )
 endef
 
 $(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_commands,$(lib))))
-
 
 # Rules to build each executable
 $(call EXE_NAME,%): build/$(BUILD)/$(call EXE_NAME,%) .build-target
@@ -389,10 +419,10 @@ define exe_rules
   EXTRA_O_FILES = $$(call o_file_name,$$(EXTRA_SRC_FILES))
 
   ifeq ($$(LINK_AGAINST_STATIC),0)
-    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(EXTRA_O_FILES) | $$(SHARED_LIBRARY_OUTPUT)
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(EXTRA_O_FILES) $(EXTERNAL_STATIC_LIBS) | $$(SHARED_LIBRARY_OUTPUT)
 	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
   else
-    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(EXTRA_O_FILES) $$(STATIC_LIBRARY_OUTPUT)
+    build/$$(BUILD)/$$(call EXE_NAME,%): build/$$(BUILD)/build/$(1)/%.o $$(O_FILES) $$(EXTRA_O_FILES) $(EXTERNAL_STATIC_LIBS) $$(STATIC_LIBRARY_OUTPUT)
 	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ $$(ALL_LDLIBS) -o $$@,Linking  )
   endif
 
