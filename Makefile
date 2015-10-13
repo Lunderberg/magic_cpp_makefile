@@ -201,7 +201,7 @@ ifneq ($(BUILD),default)
 endif
 
 ifeq ($(SYSTEM),native)
-  SYSTEM = $(shell uname)
+  SYSTEM = $(shell uname | tr A-Z a-z)
 endif
 
 # Merge the mandatory and the optional flags.
@@ -344,6 +344,10 @@ LIBRARY_INCLUDE_DIRS = include
 # directories will be added to the include path only for files within
 # this library
 LIBRARY_PRIVATE_INCLUDE_DIRS =
+
+# Extra flags that should be present when linking the shared library.
+# This may include other libraries that should be included.
+$(LIBRARY): SHARED_LDLIBS +=
 
 # Compiler flag overrides for src files within this library.
 $(LIBRARY):
