@@ -393,7 +393,9 @@ define library_commands
   $$(LIBRARY): ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_PRIVATE_INCLUDE_DIRS))
 
   ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_INCLUDE_DIRS))
-  ALL_LDLIBS += $$(LIBRARY_FLAG)
+  ifneq ($$(LINK_AGAINST_STATIC),1)
+    ALL_LDLIBS += $$(LIBRARY_FLAG)
+  endif
 
   build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$$(LIBRARY_NAME)): \
                           $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))

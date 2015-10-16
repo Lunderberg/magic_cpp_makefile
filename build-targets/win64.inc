@@ -6,8 +6,8 @@ CXX = x86_64-w64-mingw32-g++
 AR = x86_64-w64-mingw32-ar
 
 EXE_NAME = bin/$(1).exe
-SHARED_LIBRARY_NAME = $(patsubst lib%,bin/%.dll,  $(1))
-STATIC_LIBRARY_NAME = $(patsubst lib%,lib/%.dll.a,$(1))
+SHARED_LIBRARY_NAME = bin/$(1).dll
+STATIC_LIBRARY_NAME = lib/$(1).dll.a
 
 PIC_FLAG = # Because g++ complains about the flag when it is a win32 target.
 
