@@ -311,6 +311,12 @@ library_os_files   = $(addsuffix s,$(call library_o_files,$(1),$(2)))
 all: default.inc executables libraries install_resources
 	@printf "%b" "$(DGREEN)Compilation successful$(NO_COLOR)\n"
 
+ifneq ($(TEST_COMMAND),)
+  check: all
+	@echo "Running tests"
+	@$(TEST_COMMAND)
+endif
+
 # Update dependencies with each compilation
 ALL_CPPFLAGS += -MMD -MP
 -include $(shell find build -name "*.d" 2> /dev/null)
