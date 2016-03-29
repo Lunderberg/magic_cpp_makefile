@@ -186,7 +186,7 @@ $(eval $(value DEFAULT_INC_CONTENTS))
 # If default.inc does not exist, create it and display the welcome
 # message.
 ifeq (,$(wildcard default.inc))
-    $(shell echo -e '$(subst $(newline),\n,$(value DEFAULT_INC_CONTENTS))' > default.inc)
+    $(shell printf '$(subst $(newline),\n,$(value DEFAULT_INC_CONTENTS))' > default.inc)
     $(error $(WELCOME_MESSAGE))
 endif
 
