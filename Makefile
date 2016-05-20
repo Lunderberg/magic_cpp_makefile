@@ -121,6 +121,13 @@ C_EXT   = c
 # code.  No element of this list should be present in C_EXT.
 CPP_EXT = C cc cpp cxx c++ cp
 
+# A space-delimited list of file patterns to be excluded
+# For example, this may contain a source file or directory
+# that is not to be compiled in the current build.
+# % can be used to create wildcard exclusions.
+# Note: Files in the base directory are excluded as ./filename.
+EXCLUSIONS =
+
 # A function that, when given the name of a library, should return the
 # output file of a shared library.  For example, the default version,
 # when passed "MyLibrary" as $(1), will return "lib/libMyLibrary.so".
@@ -298,12 +305,14 @@ find_in_dirs = $(foreach dir,$(1),$(call find_in_dir,$(dir),$(2)))
 o_file_name  = $(foreach file,$(1),build/$(BUILD)/build/$(basename $(file)).o)
 
 # Find the source files that will be used.
-SRC_FILES = $(call find_in_dirs,$(SRC_DIRECTORIES),$(CPP_EXT) $(C_EXT))
+SRC_FILES := $(call find_in_dirs,$(SRC_DIRECTORIES),$(CPP_EXT) $(C_EXT))
+SRC_FILES := $(filter-out $(EXCLUSIONS),$(SRC_FILES))
 O_FILES = $(call o_file_name,$(SRC_FILES))
 
 # Find each library to be made.
 LIBRARY_FOLDERS   = $(foreach lib,$(LIB_DIRECTORIES),$(wildcard $(lib)))
-library_src_files = $(call find_in_dirs,$(addprefix $(1)/,$(2)),$(CPP_EXT) $(C_EXT))
+library_src_files = $(filter-out $(addprefix $(1)/,$(LIBRARY_EXCLUSIONS)),\
+                                 $(call find_in_dirs,$(addprefix $(1)/,$(2)),$(CPP_EXT) $(C_EXT)))
 library_o_files   = $(call o_file_name,$(call library_src_files,$(1),$(2)))
 library_os_files   = $(addsuffix s,$(call library_o_files,$(1),$(2)))
 
@@ -350,6 +359,14 @@ LIBRARY_INCLUDE_DIRS = include
 # directories will be added to the include path only for files within
 # this library
 LIBRARY_PRIVATE_INCLUDE_DIRS =
+
+# A space-delimited list of file patterns to be excluded
+# For example, this may contain a source file or directory
+# that is not to be compiled in the current build.
+# % can be used to create wildcard exclusions.
+# Note: Files in the library's directory should be listed as "filename",
+#    not "./filename".
+LIBRARY_EXCLUSIONS =
 
 # Extra flags that should be present when linking the shared library.
 # This may include other libraries that should be included.
@@ -421,7 +438,8 @@ $(call EXE_NAME,%): build/$(BUILD)/$(call EXE_NAME,%) .build-target
 executables:
 
 define exe_rules
-  EXE_SRC_FILES = $$(call find_in_dir,$(1),$$(CPP_EXT) $$(C_EXT))
+  EXE_SRC_FILES := $$(call find_in_dir,$(1),$$(CPP_EXT) $$(C_EXT))
+  EXE_SRC_FILES := $$(filter-out $$(EXCLUSIONS),$$(EXE_SRC_FILES))
   EXECUTABLES = $$(foreach cc,$$(EXE_SRC_FILES),$$(call EXE_NAME,$$(basename $$(notdir $$(cc)))))
   EXTRA_SRC_FILES =
   CURDIR = $(1)
