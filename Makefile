@@ -124,7 +124,7 @@ CPP_EXT = C cc cpp cxx c++ cp
 # A space-delimited list of file patterns to be excluded
 # For example, this may contain a source file or directory
 # that is not to be compiled in the current build.
-# % can be used to create wildcard exclusions.
+# %% can be used to create wildcard exclusions.
 # Note: Files in the base directory are excluded as ./filename.
 EXCLUSIONS =
 
