@@ -124,7 +124,7 @@ CPP_EXT = C cc cpp cxx c++ cp
 # A space-delimited list of file patterns to be excluded
 # For example, this may contain a source file or directory
 # that is not to be compiled in the current build.
-# % can be used to create wildcard exclusions.
+# %% can be used to create wildcard exclusions.
 # Note: Files in the base directory are excluded as ./filename.
 EXCLUSIONS =
 
@@ -341,7 +341,7 @@ define SAMPLE_MAKEFILE_INC_CONTENTS
 
 # The name of the library.
 # Defaults to LIBNAME, where libLIBNAME is the directory.
-LIBRARY_NAME = $(patsubst lib%,%,$(notdir $(CURDIR)))
+LIBRARY_NAME = $(patsubst lib%%,%%,$(notdir $(CURDIR)))
 
 # The flag that will be passed to the include the library in
 # executables.
@@ -363,8 +363,8 @@ LIBRARY_PRIVATE_INCLUDE_DIRS =
 # A space-delimited list of file patterns to be excluded
 # For example, this may contain a source file or directory
 # that is not to be compiled in the current build.
-# % can be used to create wildcard exclusions.
-# Note: Files in the library's directory should be listed as "filename",
+# %% can be used to create wildcard exclusions.
+# Note: Files in the library'"'"'s directory should be listed as "filename",
 #    not "./filename".
 LIBRARY_EXCLUSIONS =
 
@@ -377,7 +377,7 @@ $(LIBRARY):
 endef
 
 LibMakefile.inc:
-	@echo '$(subst $(newline),\n,$(value SAMPLE_MAKEFILE_INC_CONTENTS))' > Makefile.inc
+	@printf '$(subst $(newline),\n,$(value SAMPLE_MAKEFILE_INC_CONTENTS))' > Makefile.inc
 	@echo "Constructed Makefile.inc.  Place this into a library directory to customize behavior"
 
 # Rules to copy each library into their final location.
