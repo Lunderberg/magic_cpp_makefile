@@ -355,6 +355,16 @@ LIBRARY_NAME = $(patsubst lib%,%,$(notdir $(CURDIR)))
 # executables.
 LIBRARY_FLAG = -l$(LIBRARY_NAME)
 
+# The filename of the static library to be generated.
+# By default, uses the pattern registered in the top-level default.inc
+# This shouldn't have any slashes in it.
+STATIC_LIBRARY_FILENAME = $(call STATIC_LIBRARY_NAME,$(LIBRARY_NAME))
+
+# The filename of the shared library to be generated.
+# By default, uses the pattern registered in the top-level default.inc
+# This shouldn't have any slashes in it.
+SHARED_LIBRARY_FILENAME = $(call SHARED_LIBRARY_NAME,$(LIBRARY_NAME))
+
 # The directories containing source files for the library.
 LIBRARY_SRC_DIRS = src
 
@@ -401,26 +411,22 @@ SHARED_LIBRARY_OUTPUT :=
 
 define library_commands
   CURDIR = $(1)
-  STATIC_LIBRARY = $$(call STATIC_LIBRARY_NAME,$$(LIBRARY_NAME))
-  SHARED_LIBRARY = $$(call SHARED_LIBRARY_NAME,$$(LIBRARY_NAME))
-  LIBRARY = $$(SHARED_LIBRARY) $$(STATIC_LIBRARY)
 
   $$(eval $$(value SAMPLE_MAKEFILE_INC_CONTENTS))
+  LIBRARY = $$(SHARED_LIBRARY_FILENAME) $$(STATIC_LIBRARY_FILENAME)
 
   -include $(1)/Makefile.inc
 
-  STATIC_LIBRARY_OUTPUT += $$(STATIC_LIBRARY)
-  SHARED_LIBRARY_OUTPUT += $$(SHARED_LIBRARY)
-
-  ifeq ($$(BUILD_STATIC),0)
-    STATIC_LIBRARY :=
+  ifneq ($$(BUILD_STATIC),0)
+    STATIC_LIBRARY_OUTPUT += $$(STATIC_LIBRARY_FILENAME)
+    libraries: $$(STATIC_LIBRARY_FILENAME)
   endif
 
-  ifeq ($$(BUILD_SHARED),0)
-    SHARED_LIBRARY :=
+  ifneq ($$(BUILD_SHARED),0)
+    SHARED_LIBRARY_OUTPUT += $$(SHARED_LIBRARY_FILENAME)
+    libraries: $$(SHARED_LIBRARY_FILENAME)
   endif
 
-  libraries: $$(LIBRARY)
   $$(LIBRARY): ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_PRIVATE_INCLUDE_DIRS))
 
   ALL_CPPFLAGS += $$(addprefix -I$(1)/,$$(LIBRARY_INCLUDE_DIRS))
@@ -428,13 +434,22 @@ define library_commands
     ALL_LDLIBS += $$(LIBRARY_FLAG)
   endif
 
-  build/$$(BUILD)/$$(call SHARED_LIBRARY_NAME,$$(LIBRARY_NAME)): \
+  # Build the libraries themselves
+  build/$$(BUILD)/$$(SHARED_LIBRARY_FILENAME): \
                           $$(call library_os_files,$(1),$$(LIBRARY_SRC_DIRS))
 	@$$(call run_and_test,$$(CXX) $$(ALL_LDFLAGS) $$^ -shared $$(SHARED_LDLIBS) -o $$@,Linking  )
 
-  build/$$(BUILD)/$$(call STATIC_LIBRARY_NAME,$$(LIBRARY_NAME)): \
+  build/$$(BUILD)/$$(STATIC_LIBRARY_FILENAME): \
                            $$(call library_o_files,$(1),$$(LIBRARY_SRC_DIRS))
 	@$$(call run_and_test,$$(AR) rcs $$@ $$^,Linking  )
+
+  # Copy the libraries into their final location
+  $$(SHARED_LIBRARY_FILENAME): build/$$(BUILD)/$$(SHARED_LIBRARY_FILENAME) .build-target
+	@$$(call run_and_test,cp --remove-destination $$< $$@,Copying  )
+
+  $$(STATIC_LIBRARY_FILENAME): build/$$(BUILD)/$$(STATIC_LIBRARY_FILENAME) .build-target
+	@$$(call run_and_test,cp -f $$< $$@,Copying  )
+
 endef
 
 $(foreach lib,$(LIBRARY_FOLDERS),$(eval $(call library_commands,$(lib))))
