@@ -63,17 +63,36 @@ def apply_lib_dir(env, lib_env, lib_dir, lib_name = None):
 
     return shlib
 
+def default_environment():
+    env = Environment(ENV = os.environ)
+    env['CPPPATH'] = []
+    env['LIBPATH'] = []
+    env['RPATH'] = []
+    env['LIBS'] = []
+    if 'VERBOSE' not in ARGUMENTS:
+        brief_output(env)
+
+    env.Append(CCFLAGS=['-pthread','-Wall','-Wextra','-pedantic'])
+    env.Append(CXXFLAGS=['-std=c++14'])
+    env.Append(LINKFLAGS=['-pthread'])
+
+    if 'OPTIMIZE' in ARGUMENTS:
+        env.Append(CCFLAGS=['-O'+ARGUMENTS['OPTIMIZE']])
+    else:
+        env.Append(CCFLAGS=['-O3'])
+
+    if 'RELEASE' in ARGUMENTS and ARGUMENTS['RELEASE'] != '0':
+        env.Append(CPPDEFINES=['NDEBUG'])
+        env.Append(CPPFLAGS=['-s'])
+    else:
+        env.Append(CPPFLAGS=['-g'])
+
+    return env
+
+
 special_paths = [build_dir, bin_dir, lib_dir]
 
-env = Environment(ENV = os.environ)
-
-env['CPPPATH'] = []
-env['LIBPATH'] = []
-env['RPATH'] = []
-env['LIBS'] = []
-if not ARGUMENTS.get('VERBOSE'):
-    brief_output(env)
-
+env = default_environment()
 lib_env = env.Clone()
 
 env.VariantDir(build_dir,'.',duplicate=False)
