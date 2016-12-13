@@ -34,36 +34,127 @@ def glob_all_in_dir(path):
     """
     Given a path, find all source files in that directory.
     """
-    path = str(path)
     output = []
     for ext in source_file_extensions:
-        output.extend(Glob(os.path.join(path,'*.{}'.format(ext))))
+        output.extend(path.glob('*.{}'.format(ext)))
     return output
 
-def apply_lib_dir(env, lib_env, lib_dir, lib_name = None):
+def apply_lib_dir(lib_env, lib_dir, lib_name = None):
     """
     Apply all actions needed, given a particular library directory.
     Returns the shared library that was made.
     """
-    src_dir = os.path.join(str(lib_dir),'src')
-    inc_dir = os.path.join(str(lib_dir),'include')
-    src_files = glob_all_in_dir(src_dir)
+    inc_dir = lib_dir.glob('include')
+    inc_dir = [d.RDirs('.') for d in inc_dir]
+
+    src_files = glob_all_in_dir(lib_dir.Dir('src'))
 
     if lib_name is None:
         lib_name = lib_dir.name
 
     cpppath = lib_env['CPPPATH'] + [inc_dir]
-    env.Append(CPPPATH=[inc_dir])
     shlib = lib_env.SharedLibrary(
         os.path.join(str(lib_dir),lib_name),
-        src_files, CPPPATH=cpppath)
+        src_files, CPPPATH=cpppath)[0]
 
-    env.Append(LIBPATH=[shlib[0].dir])
-    env.Append(LIBS=[shlib[0].name])
+    shlib.usage = {
+        'CPPPATH':[inc_dir],
+        'LIBPATH':[shlib.dir],
+        'LIBS':[shlib.name]
+        }
 
     return shlib
 
+def find_python_include(python_version = None):
+    """
+    Find the include directory for Python.h
+    If python_version is specied, look for that one.
+    Otherwise, search for python3, then python, then python2.
+    """
+    import distutils.spawn
+    import subprocess
+
+    if python_version is None:
+        python_versions = ['python3','python','python2']
+    else:
+        python_versions = [python_versions]
+
+    for version in python_versions:
+        exe = distutils.spawn.find_executable(version)
+        if exe:
+            break
+    else:
+        raise RuntimeError("Could not find python executable")
+
+    output = subprocess.check_output([exe, '-c',
+                                      'from distutils.sysconfig import get_python_inc;'
+                                      'print (get_python_inc())'])
+    return output[:-1] # remove training newline
+
+
+def apply_py_dir(lib_env, py_dir, shared_libs, pybind11_dir, lib_name = None):
+    """
+    Apply all actions needed, given a directory to be made into a python library.
+    Returns the shared library that was made.
+    """
+    if lib_name is None:
+        lib_name = py_dir.name
+        if lib_name.startswith('py'):
+            lib_name = lib_name[2:]
+
+
+    dependencies = []
+    prefix = lib_env.subst(lib_env['SHLIBPREFIX'])
+    suffix = lib_env.subst(lib_env['SHLIBSUFFIX'])
+    for shlib in shared_libs:
+        if (shlib.name.startswith(prefix) and
+            shlib.name.endswith(suffix)):
+            name = shlib.name[len(prefix):-len(suffix)]
+            if name.lower() == lib_name.lower():
+                dependencies.append(shlib)
+
+    py_env = lib_env.Clone()
+    py_env.Append(CPPPATH=pybind11_dir.Dir('include'))
+    py_env.Append(CPPPATH=py_dir.Dir('include'))
+    for dep in dependencies:
+        py_env.Append(**dep.usage)
+
+    if dependencies:
+        py_env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN'))])
+
+    py_env.Append(CPPPATH=find_python_include(lib_env.get('PYTHON_VERSION',None)))
+    py_env['SHLIBPREFIX'] = ''
+
+    return apply_lib_dir(py_env, py_dir, lib_name)
+
+
+def get_pybind11_dir(build_dir):
+    """
+    Returns the directory to pybind11.
+    If it already exists, just return.
+    Otherwise, download it from github and unzip.
+    """
+    folder = build_dir.glob('pybind11-*')
+    if folder:
+        return folder[0]
+
+    import urllib2
+    import StringIO
+    import zipfile
+    response = urllib2.urlopen('https://github.com/pybind/pybind11/archive/v1.8.1.zip')
+    contents = StringIO.StringIO(response.read())
+    zipped = zipfile.ZipFile(contents)
+    members = [filename for filename in zipped.namelist()
+               if 'include' in filename or 'LICENSE' in filename]
+    zipped.extractall(str(build_dir),members)
+
+    return build_dir.glob('pybind11-*')[0]
+
+
 def default_environment():
+    """
+    The environment that is used to build everything.
+    """
     env = Environment(ENV = os.environ)
     env['CPPPATH'] = []
     env['LIBPATH'] = []
@@ -87,31 +178,55 @@ def default_environment():
     else:
         env.Append(CPPFLAGS=['-g'])
 
+    if 'PYTHON_VERSION' in ARGUMENTS:
+        env['PYTHON_VERSION'] = ARGUMENTS['PYTHON_VERSION']
+
     return env
 
 
-special_paths = [build_dir, bin_dir, lib_dir]
+
+
+build_dir = Dir(build_dir)
+bin_dir = Dir(bin_dir)
+lib_dir = Dir(lib_dir)
+pybind11_dir = get_pybind11_dir(build_dir)
+
+special_paths = [build_dir,
+                 bin_dir,
+                 lib_dir,
+                 pybind11_dir,
+]
 
 env = default_environment()
 lib_env = env.Clone()
-
 env.VariantDir(build_dir,'.',duplicate=False)
 
-lib_directories = [f for f in Glob(os.path.join(build_dir,'lib*'))
-                   if isinstance(f, SCons.Node.FS.Dir) and f.name not in special_paths]
-shared_libs = [apply_lib_dir(env,lib_env,lib) for lib in lib_directories]
+lib_directories = [build_dir.Dir(f.name) for f in Glob('lib*')
+                   if f not in special_paths]
+shared_libs = [apply_lib_dir(lib_env,lib) for lib in lib_directories]
 
-src_files = glob_all_in_dir(os.path.join(build_dir,'src'))
-exe_files = glob_all_in_dir(os.path.join(build_dir,'.'))
+for shlib in shared_libs:
+    env.Append(**shlib.usage)
+
+py_directories = [build_dir.Dir(f.name) for f in Glob('py*')
+                  if f not in special_paths]
+py_libs = [apply_py_dir(lib_env,py_dir,shared_libs,pybind11_dir) for py_dir in py_directories]
+
+src_files = glob_all_in_dir(build_dir.Dir('src'))
+exe_files = glob_all_in_dir(build_dir)
 env.Append(CPPPATH=['include'])
 env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN',
-                                       os.path.relpath(bin_dir,lib_dir)))])
+                                       bin_dir.rel_path(lib_dir)))])
 
 progs = [env.Program([exe_file,src_files]) for exe_file in exe_files]
 
+
 env.Install(lib_dir,shared_libs)
+env.Install(lib_dir,py_libs)
 env.Install(bin_dir,progs)
 
-for path in special_paths:
-    if path != '.':
-        env.Clean('.',path)
+if bin_dir != Dir('.'):
+    env.Clean('.',bin_dir)
+
+if lib_dir != Dir('.'):
+    env.Clean('.',lib_dir)
