@@ -57,11 +57,11 @@ def apply_lib_dir(lib_env, lib_dir, lib_name = None):
         os.path.join(str(lib_dir),lib_name),
         src_files, CPPPATH=cpppath)[0]
 
-    shlib.usage = {
+    shlib.attributes.usage = {
         'CPPPATH':[inc_dir],
         'LIBPATH':[shlib.dir],
         'LIBS':[shlib.name]
-        }
+    }
 
     return shlib
 
@@ -117,7 +117,7 @@ def apply_py_dir(lib_env, py_dir, shared_libs, pybind11_dir, lib_name = None):
     py_env.Append(CPPPATH=pybind11_dir.Dir('include'))
     py_env.Append(CPPPATH=py_dir.Dir('include'))
     for dep in dependencies:
-        py_env.Append(**dep.usage)
+        py_env.Append(**dep.attributes.usage)
 
     if dependencies:
         py_env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN'))])
@@ -206,7 +206,7 @@ lib_directories = [build_dir.Dir(f.name) for f in Glob('lib*')
 shared_libs = [apply_lib_dir(lib_env,lib) for lib in lib_directories]
 
 for shlib in shared_libs:
-    env.Append(**shlib.usage)
+    env.Append(**shlib.attributes.usage)
 
 py_directories = [build_dir.Dir(f.name) for f in Glob('py*')
                   if f not in special_paths]
