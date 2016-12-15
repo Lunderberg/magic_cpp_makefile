@@ -78,7 +78,7 @@ def find_python_include(python_version = None):
     if python_version is None:
         python_versions = ['python3','python','python2']
     else:
-        python_versions = [python_versions]
+        python_versions = [python_version]
 
     for version in python_versions:
         exe = distutils.spawn.find_executable(version)
