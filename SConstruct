@@ -17,6 +17,7 @@ import os
 
 import SCons
 
+
 def brief_output(env):
     """
     Edits the various command strings printed to screen to be briefer.
@@ -134,14 +135,14 @@ def get_pybind11_dir(build_dir):
     If it already exists, just return.
     Otherwise, download it from github and unzip.
     """
-    folder = build_dir.glob('pybind11-*')
+    folder = build_dir.glob('pybind11-master')
     if folder:
         return folder[0]
 
     import urllib2
     import StringIO
     import zipfile
-    response = urllib2.urlopen('https://github.com/pybind/pybind11/archive/v1.8.1.zip')
+    response = urllib2.urlopen('https://github.com/pybind/pybind11/archive/master.zip')
     contents = StringIO.StringIO(response.read())
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist()
@@ -206,7 +207,10 @@ lib_directories = [build_dir.Dir(f.name) for f in Glob('lib*')
 shared_libs = [apply_lib_dir(lib_env,lib) for lib in lib_directories]
 
 for shlib in shared_libs:
+    # action = env.AddPreAction(shlib, Action('echo Before {}'.format(shlib),strfunction = lambda *args:''))
+    # action = env.AddPostAction(shlib, Action('echo After {}'.format(shlib),strfunction = lambda *args:''))
     env.Append(**shlib.attributes.usage)
+
 
 py_directories = [build_dir.Dir(f.name) for f in Glob('py*')
                   if f not in special_paths]
@@ -230,3 +234,25 @@ if bin_dir != Dir('.'):
 
 if lib_dir != Dir('.'):
     env.Clean('.',lib_dir)
+
+
+class PrettyWrapper(object):
+    def __init__(self, env, com):
+        self.cmd = [env[com]]
+
+    def __call__(self, target, source, env):
+        print 'Making {} from {}'.format(target,source)
+        shell = env['SHELL']
+        escape = env.get('ESCAPE', lambda x:x)
+        passing_env = env['ENV']
+        cmd = env.subst_list([self.cmd], 0, target, source)
+        import IPython; IPython.embed()
+
+def temp(sh, escape, cmd, args, spawnenv):
+    print 'cmd=',cmd
+    print 'args=',args
+#env['SPAWN'] = temp
+#import IPython; IPython.embed()
+
+#env['CXXCOM'] = PrettyWrapper(env, 'CXXCOM')
+#import pudb; pudb.set_trace()
