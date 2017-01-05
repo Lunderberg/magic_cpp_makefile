@@ -213,7 +213,7 @@ def find_python_include(python_version = None):
     return output[:-1] # remove training newline
 
 
-def apply_py_dir(lib_env, py_dir, shared_libs, pybind11_dir, lib_name = None):
+def apply_py_dir(lib_env, py_dir, shared_libs, lib_name = None):
     """
     Apply all actions needed, given a directory to be made into a python library.
     Returns the shared library that was made.
@@ -235,7 +235,7 @@ def apply_py_dir(lib_env, py_dir, shared_libs, pybind11_dir, lib_name = None):
                 dependencies.append(shlib)
 
     py_env = lib_env.Clone()
-    py_env.Append(CPPPATH=pybind11_dir.Dir('include'))
+    py_env.Append(CPPPATH=get_pybind11_dir().Dir('include'))
     py_env.Append(CPPPATH=py_dir.Dir('include'))
     for dep in dependencies:
         py_env.Append(**dep.attributes.usage)
@@ -249,7 +249,7 @@ def apply_py_dir(lib_env, py_dir, shared_libs, pybind11_dir, lib_name = None):
     return apply_lib_dir(py_env, py_dir, lib_name)
 
 
-def get_pybind11_dir(build_dir):
+def get_pybind11_dir():
     """
     Returns the directory to pybind11.
     If it already exists, just return.
@@ -311,17 +311,13 @@ def default_environment():
     return env
 
 
-
-
 build_dir = Dir(build_dir)
 bin_dir = Dir(bin_dir)
 lib_dir = Dir(lib_dir)
-pybind11_dir = get_pybind11_dir(build_dir)
 
 special_paths = [build_dir,
                  bin_dir,
                  lib_dir,
-                 pybind11_dir,
 ]
 
 env = default_environment()
@@ -337,7 +333,7 @@ for shlib in shared_libs:
 
 py_directories = [build_dir.Dir(f.name) for f in Glob('py*')
                   if f not in special_paths]
-py_libs = [apply_py_dir(lib_env,py_dir,shared_libs,pybind11_dir) for py_dir in py_directories]
+py_libs = [apply_py_dir(lib_env,py_dir,shared_libs) for py_dir in py_directories]
 
 src_files = glob_all_in_dir(build_dir.Dir('src'))
 exe_files = glob_all_in_dir(build_dir)
