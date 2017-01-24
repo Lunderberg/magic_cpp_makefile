@@ -229,15 +229,24 @@ def main_dir(env, main, inc_dir='include', src_dir='src'):
 
 
 def compile_folder_dwim(env, base_dir):
-    for dir in build_dir.glob('lib*'):
-        if dir not in special_paths:
-            env.SharedLibraryDir(dir)
+    base_dir = Dir(base_dir)
 
-    for dir in build_dir.glob('py*'):
-        if dir not in special_paths:
-            env.PythonLibraryDir(dir)
+    sconscript = base_dir.glob('SConscript')
+    # The extra "base_dir != Dir('.')" is to prevent infinite
+    # recursion, if a SConscript calls CompileFolderDWIM.
+    if sconscript and base_dir != Dir('.'):
+        env.SConscript(sconscript, exports=['env'])
 
-    env.MainDir(base_dir)
+    else:
+        for dir in build_dir.glob('lib*'):
+            if dir not in special_paths:
+                env.SharedLibraryDir(dir)
+
+        for dir in build_dir.glob('py*'):
+            if dir not in special_paths:
+                env.PythonLibraryDir(dir)
+
+        env.MainDir(base_dir)
 
 def default_environment():
     """
