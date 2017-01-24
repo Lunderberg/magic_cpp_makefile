@@ -201,7 +201,7 @@ def get_pybind11_dir():
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist()
                if 'include' in filename or 'LICENSE' in filename]
-    zipped.extractall(str(dep_dir),members)
+    zipped.extractall(dep_dir.abspath,members)
 
     return folder
 
