@@ -63,22 +63,31 @@ def brief_output(env):
     env['SHLINKCOMSTR'] = '${DBLUE}Linking shared ${DCYAN}${TARGETS}${RESET_COLOR}'
 
 all_libs = []
-def shared_library_dir(env, target=None, source=None, add_to_all_libs=True):
+def shared_library_dir(env, target=None, source=None, add_to_all_libs=True, dependencies=None):
+    env = env.Clone()
+
     if source is None:
         source = target
         target = None
-
 
     source = Dir(source)
 
     if target is None:
         target = os.path.join(str(source), source.name)
 
+    if dependencies is not None:
+        dependencies = find_libraries(dependencies)
+        for dep in dependencies:
+            env.Append(**dep.attributes.usage)
+        if dependencies:
+            env.Append(RPATH=[Literal('\\$$ORIGIN')])
+
     if source.glob('include'):
         inc_dir = source.glob('include')[0]
     else:
         inc_dir = source
     inc_dir = inc_dir.RDirs('.')
+    env.Append(CPPPATH=inc_dir)
 
     if source.glob('src'):
         src_dir = source.glob('src')[0]
@@ -87,12 +96,16 @@ def shared_library_dir(env, target=None, source=None, add_to_all_libs=True):
 
     src_files = [src_dir.glob(g) for g in source_file_globs]
 
-    shlib = env.SharedLibrary(target, src_files,
-                              CPPPATH=env['CPPPATH'] + inc_dir)[0]
+    shlib = env.SharedLibrary(target, src_files)[0]
+
+    prefix = env.subst(env['SHLIBPREFIX'])
+    suffix = env.subst(env['SHLIBSUFFIX'])
+    shlib_name = shlib.name[len(prefix):-len(suffix)]
+
     shlib.attributes.usage = {
         'CPPPATH':inc_dir,
         'LIBPATH':[shlib.dir],
-        'LIBS':[shlib.name],
+        'LIBS':[shlib_name],
         }
 
     env.Install(lib_dir, shlib)
@@ -103,7 +116,19 @@ def shared_library_dir(env, target=None, source=None, add_to_all_libs=True):
     return shlib
 
 
-def python_library_dir(env, target=None, source=None):
+def find_libraries(lib_names):
+    lib_names = [name.lower() for name in lib_names]
+
+    output = []
+    for shlib in all_libs:
+        shlib_name = shlib.attributes.usage['LIBS'][0]
+        if shlib_name.lower() in lib_names:
+            output.append(shlib)
+
+    return output
+
+
+def python_library_dir(env, target=None, source=None, dependencies=None):
     if source is None:
         source = target
         target = None
@@ -114,29 +139,21 @@ def python_library_dir(env, target=None, source=None):
         if lib_name.startswith('py'):
             lib_name = lib_name[2:]
         target = os.path.join(str(source), lib_name)
+    else:
+        lib_name = os.path.splitext(os.path.split(str(target))[1])[0]
 
-    dependencies = []
-    prefix = env.subst(env['SHLIBPREFIX'])
-    suffix = env.subst(env['SHLIBSUFFIX'])
-    for shlib in all_libs:
-        if (shlib.name.startswith(prefix) and
-            shlib.name.endswith(suffix)):
-            name = shlib.name[len(prefix):-len(suffix)]
-            if name.lower() == lib_name.lower():
-                dependencies.append(shlib)
+    if dependencies is None:
+        dependencies = []
+    dependencies.append(lib_name)
 
     py_env = env.Clone()
     py_env.Append(CPPPATH=get_pybind11_dir().Dir('include'))
     py_env.Append(CPPPATH=find_python_include(env.get('PYTHON_VERSION',None)))
-    for dep in dependencies:
-        py_env.Append(**dep.attributes.usage)
-
-    if dependencies:
-        py_env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN'))])
 
     py_env['SHLIBPREFIX'] = ''
 
-    return shared_library_dir(py_env, target, source, add_to_all_libs=False)
+    return shared_library_dir(py_env, target, source,
+                              add_to_all_libs=False, dependencies=dependencies)
 
 
 def find_python_include(python_version = None):
