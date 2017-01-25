@@ -206,6 +206,65 @@ def get_pybind11_dir():
     return folder
 
 
+def unit_test_dir(env, target=None, source=None):
+    env = env.Clone()
+
+    if source is None:
+        source = target
+        target = None
+    source = Dir(source)
+
+    if target is None:
+        target = os.path.join(str(source), 'run_tests')
+
+    for dep in all_libs:
+        env.Append(**dep.attributes.usage)
+    env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN',
+                                           bin_dir.rel_path(lib_dir)))])
+
+    googletest_dir = get_googletest_dir()
+    inc_dir = googletest_dir.Dir('googletest/include').RDirs('.')
+    env.Append(CPPPATH=inc_dir)
+    inc_dir = googletest_dir.Dir('googletest').RDirs('.')
+    env.Append(CPPPATH=inc_dir)
+
+    src_files = [source.glob(g) for g in source_file_globs]
+    src_files.extend(googletest_dir.glob('main.cc'))
+    src_files.extend(googletest_dir.glob('googletest/src/gtest-all.cc'))
+
+    prog = env.Program(target, src_files)
+    env.Install(bin_dir, prog)
+
+
+def get_googletest_dir():
+    folder = dep_dir.Dir('googletest-master')
+    if folder.exists():
+        return folder
+
+    import urllib2
+    import StringIO
+    import zipfile
+    response = urllib2.urlopen('https://github.com/google/googletest/archive/master.zip')
+    contents = StringIO.StringIO(response.read())
+    zipped = zipfile.ZipFile(contents)
+    members = [filename for filename in zipped.namelist() if
+               'googletest/include' in filename or
+               'googletest/src' in filename or
+               'googletest/LICENSE' in filename]
+    zipped.extractall(dep_dir.abspath,members)
+
+    with open(os.path.join(str(folder), 'main.cc'),'w') as f:
+        f.write("""
+                #include <gtest/gtest.h>
+
+                int main(int argc, char** argv){
+                  ::testing::InitGoogleTest(&argc, argv);
+                  return RUN_ALL_TESTS();
+                }""")
+
+    return folder
+
+
 def main_dir(env, main, inc_dir='include', src_dir='src'):
     main = Dir(main)
 
@@ -238,15 +297,18 @@ def compile_folder_dwim(env, base_dir):
         env.SConscript(sconscript, exports=['env'])
 
     else:
-        for dir in build_dir.glob('lib*'):
+        for dir in base_dir.glob('lib*'):
             if dir not in special_paths:
                 env.SharedLibraryDir(dir)
 
-        for dir in build_dir.glob('py*'):
+        for dir in base_dir.glob('py*'):
             if dir not in special_paths:
                 env.PythonLibraryDir(dir)
 
         env.MainDir(base_dir)
+
+        if base_dir.glob('tests'):
+            env.UnitTestDir(base_dir.glob('tests')[0])
 
 def default_environment():
     """
@@ -285,6 +347,7 @@ def default_environment():
     env.AddMethod(shared_library_dir, 'SharedLibraryDir')
     env.AddMethod(python_library_dir, 'PythonLibraryDir')
     env.AddMethod(main_dir, 'MainDir')
+    env.AddMethod(unit_test_dir, 'UnitTestDir')
     env.AddMethod(compile_folder_dwim, 'CompileFolderDWIM')
 
     return env
