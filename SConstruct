@@ -262,7 +262,7 @@ def get_googletest_dir():
                'googletest/LICENSE' in filename]
     zipped.extractall(dep_dir.abspath,members)
 
-    with open(os.path.join(str(folder), 'main.cc'),'w') as f:
+    with open(os.path.join(folder.abspath, 'main.cc'),'w') as f:
         f.write("""
                 #include <gtest/gtest.h>
 
