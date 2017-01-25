@@ -20,6 +20,8 @@ import sys
 
 import SCons
 
+SCons.Warnings.suppressWarningClass(SCons.Warnings.DuplicateEnvironmentWarning)
+
 def ansi_colors(env):
     env['RESET_COLOR'] = '\033[39;49m'
 
@@ -206,7 +208,8 @@ def get_pybind11_dir():
     return folder
 
 
-def unit_test_dir(env, target=None, source=None):
+def unit_test_dir(env, target=None, source=None,
+                  extra_inc_dir=None, extra_src_dir=None):
     env = env.Clone()
 
     if source is None:
@@ -223,15 +226,21 @@ def unit_test_dir(env, target=None, source=None):
                                            bin_dir.rel_path(lib_dir)))])
 
     googletest_dir = get_googletest_dir()
-    inc_dir = googletest_dir.Dir('googletest/include').RDirs('.')
-    env.Append(CPPPATH=inc_dir)
-    inc_dir = googletest_dir.Dir('googletest').RDirs('.')
-    env.Append(CPPPATH=inc_dir)
+    env.Append(CPPPATH=googletest_dir.Dir('googletest').RDirs('.'))
+    env.Append(CPPPATH=googletest_dir.Dir('googletest/include').RDirs('.'))
 
     src_files = [source.glob(g) for g in source_file_globs]
     src_files.extend(googletest_dir.glob('main.cc'))
     src_files.extend(googletest_dir.glob('googletest/src/gtest-all.cc'))
 
+    if extra_inc_dir is not None:
+        env.Append(CPPPATH=Dir(extra_inc_dir).RDirs('.'))
+
+    if extra_src_dir is not None:
+        extra_src_dir = Dir(extra_src_dir)
+        src_files.extend(extra_src_dir.glob(g) for g in source_file_globs)
+
+    src_files = [env.Object(src.abspath) for src in Flatten(src_files)]
     prog = env.Program(target, src_files)
     env.Install(bin_dir, prog)
 
@@ -308,7 +317,9 @@ def compile_folder_dwim(env, base_dir):
         env.MainDir(base_dir)
 
         if base_dir.glob('tests'):
-            env.UnitTestDir(base_dir.glob('tests')[0])
+            env.UnitTestDir(base_dir.glob('tests')[0],
+                            extra_inc_dir=base_dir.Dir('include'),
+                            extra_src_dir=base_dir.Dir('src'))
 
 def default_environment():
     """

@@ -3,4 +3,6 @@
 
 void func_A();
 
+int second_func_A();
+
 #endif /* _A_H_ */
