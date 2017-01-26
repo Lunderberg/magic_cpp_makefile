@@ -303,7 +303,13 @@ def compile_folder_dwim(env, base_dir):
     # The extra "base_dir != Dir('.')" is to prevent infinite
     # recursion, if a SConscript calls CompileFolderDWIM.
     if sconscript and base_dir != Dir('.'):
-        env.SConscript(sconscript, exports=['env'])
+        output = env.SConscript(sconscript, exports=['env'])
+        try:
+            output.attributes.usage
+            env.Install(lib_dir, output)
+            all_libs.append(output)
+        except (AttributeError,IndexError):
+            pass
 
     else:
         for dir in base_dir.glob('lib*'):
