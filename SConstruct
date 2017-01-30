@@ -274,6 +274,100 @@ def get_googletest_dir():
     return folder
 
 
+def irrlicht_lib(env):
+    env = env.Clone()
+
+    irrlicht_dir = get_irrlicht_dir()
+
+    inc_dir = irrlicht_dir.Dir('include')
+    internal_inc_dir = [irrlicht_dir.Dir(dname) for dname in
+                        ['source/Irrlicht/zlib', 'source/Irrlicht/jpeglib',
+                         'source/Irrlicht/libpng']]
+
+    src_dir = irrlicht_dir.Dir('source/Irrlicht')
+
+    src_files = Flatten([src_dir.glob(g)
+                         for g in source_file_globs])
+
+    lzma_files = ['lzma/LzmaDec.c']
+    zlib_files = ['zlib/adler32.c', 'zlib/compress.c', 'zlib/crc32.c', 'zlib/deflate.c',
+                  'zlib/inffast.c', 'zlib/inflate.c', 'zlib/inftrees.c', 'zlib/trees.c',
+                  'zlib/uncompr.c', 'zlib/zutil.c']
+    jpeglib_files = ['jpeglib/jcapimin.c', 'jpeglib/jcapistd.c', 'jpeglib/jccoefct.c', 'jpeglib/jccolor.c',
+                     'jpeglib/jcdctmgr.c', 'jpeglib/jchuff.c', 'jpeglib/jcinit.c', 'jpeglib/jcmainct.c',
+                     'jpeglib/jcmarker.c', 'jpeglib/jcmaster.c', 'jpeglib/jcomapi.c', 'jpeglib/jcparam.c',
+                     'jpeglib/jcprepct.c', 'jpeglib/jcsample.c', 'jpeglib/jctrans.c', 'jpeglib/jdapimin.c',
+                     'jpeglib/jdapistd.c', 'jpeglib/jdatadst.c', 'jpeglib/jdatasrc.c', 'jpeglib/jdcoefct.c',
+                     'jpeglib/jdcolor.c', 'jpeglib/jddctmgr.c', 'jpeglib/jdhuff.c', 'jpeglib/jdinput.c',
+                     'jpeglib/jdmainct.c', 'jpeglib/jdmarker.c', 'jpeglib/jdmaster.c', 'jpeglib/jdmerge.c',
+                     'jpeglib/jdpostct.c', 'jpeglib/jdsample.c', 'jpeglib/jdtrans.c', 'jpeglib/jerror.c',
+                     'jpeglib/jfdctflt.c', 'jpeglib/jfdctfst.c', 'jpeglib/jfdctint.c', 'jpeglib/jidctflt.c',
+                     'jpeglib/jidctfst.c', 'jpeglib/jidctint.c', 'jpeglib/jmemmgr.c', 'jpeglib/jmemnobs.c',
+                     'jpeglib/jquant1.c', 'jpeglib/jquant2.c', 'jpeglib/jutils.c', 'jpeglib/jcarith.c',
+                     'jpeglib/jdarith.c', 'jpeglib/jaricom.c']
+    png_files = ['libpng/png.c', 'libpng/pngerror.c', 'libpng/pngget.c', 'libpng/pngmem.c',
+                    'libpng/pngpread.c', 'libpng/pngread.c', 'libpng/pngrio.c', 'libpng/pngrtran.c',
+                    'libpng/pngrutil.c', 'libpng/pngset.c', 'libpng/pngtrans.c', 'libpng/pngwio.c',
+                    'libpng/pngwrite.c', 'libpng/pngwtran.c', 'libpng/pngwutil.c']
+    aesGladman_files = ['aesGladman/aescrypt.cpp', 'aesGladman/aeskey.cpp', 'aesGladman/aestab.cpp', 'aesGladman/fileenc.cpp',
+                'aesGladman/hmac.cpp', 'aesGladman/prng.cpp', 'aesGladman/pwd2key.cpp', 'aesGladman/sha1.cpp',
+                'aesGladman/sha2.cpp']
+    bzip2_files = ['bzip2/blocksort.c', 'bzip2/huffman.c', 'bzip2/crctable.c', 'bzip2/randtable.c',
+                   'bzip2/bzcompress.c', 'bzip2/decompress.c', 'bzip2/bzlib.c']
+
+    all_lib_files = [src_dir.File(f) for f in
+                     Flatten([lzma_files, zlib_files, jpeglib_files, png_files, aesGladman_files, bzip2_files])]
+
+
+    defines = {'IRRLICHT_EXPORTS': 1,
+               'PNG_THREAD_UNSAFE_OK': '',
+               'PNG_NO_MMX_CODE': '',
+               'PNG_NO_MNG_FEATURES': '',
+               }
+
+    env.Append(CCFLAGS=['-w']) # Because irrlicht has too many warnings.
+    env.Append(CPPPATH=[inc_dir,internal_inc_dir])
+    env.Append(LIBS=['GL','Xxf86vm','Xext','X11','Xcursor'])
+    env.Append(CPPDEFINES=defines)
+    env.Append(CCFLAGS=['-U__STRICT_ANSI__'])
+
+    shlib = env.SharedLibrary('Irrlicht', [src_files, all_lib_files])[0]
+
+    shlib.attributes.usage = {
+        'CPPPATH': [inc_dir],
+        'LIBPATH': shlib.dir,
+        'LIBS': 'Irrlicht',
+        'CPPDEFINES': defines,
+        }
+    all_libs.append(shlib)
+
+    env.Install(lib_dir, shlib)
+
+    return shlib
+
+
+def get_irrlicht_dir():
+    folder = dep_dir.glob('irrlicht*')
+    if folder:
+        return folder[0]
+
+    import urllib2
+    import StringIO
+    import zipfile
+    response = urllib2.urlopen('https://downloads.sourceforge.net/project/irrlicht/Irrlicht%20SDK/1.8/1.8.4/irrlicht-1.8.4.zip')
+
+    contents = StringIO.StringIO(response.read())
+    zipped = zipfile.ZipFile(contents)
+
+    members = [filename for filename in zipped.namelist() if
+               'source/Irrlicht' in filename or
+               'include' in filename or
+               'license' in filename]
+    zipped.extractall(dep_dir.abspath,members)
+
+    return dep_dir.glob('irrlicht*')[0]
+
+
 def main_dir(env, main, inc_dir='include', src_dir='src'):
     main = Dir(main)
 
@@ -366,6 +460,7 @@ def default_environment():
     env.AddMethod(main_dir, 'MainDir')
     env.AddMethod(unit_test_dir, 'UnitTestDir')
     env.AddMethod(compile_folder_dwim, 'CompileFolderDWIM')
+    env.AddMethod(irrlicht_lib, 'IrrlichtLib')
 
     return env
 
