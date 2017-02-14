@@ -2,14 +2,7 @@
 
 # ------------------- configuration section -------------------
 
-build_dir = 'build'
-
-bin_dir = 'bin'
-
-lib_dir = 'lib'
-
-source_file_globs = ['*.cc', '*.cpp', '*.cxx', '*.c++', '*.C++',
-                     '*.c', '*.C']
+build_dir = Dir('build')
 
 # ------------------- implementation section -------------------
 
@@ -21,6 +14,58 @@ import sys
 import SCons
 
 SCons.Warnings.suppressWarningClass(SCons.Warnings.DuplicateEnvironmentWarning)
+
+def default_environment():
+    """
+    The environment that is used to build everything.
+    """
+    env = Environment(ENV = os.environ)
+
+    env['bin_dir'] = Dir('bin')
+    env['lib_dir'] = Dir('lib')
+    env['top_level'] = Dir('.')
+    env['source_file_globs'] = ['*.cc', '*.cpp', '*.cxx', '*.c++', '*.C++',
+                                '*.c', '*.C']
+
+    # Because scons behaves poorly if these aren't initialized as lists
+    env['CPPPATH'] = []
+    env['LIBPATH'] = []
+    env['RPATH'] = []
+    env['LIBS'] = []
+
+    if 'VERBOSE' not in ARGUMENTS:
+        brief_output(env)
+
+    if 'NOCOLOR' not in ARGUMENTS:
+        ansi_colors(env)
+
+    env.Append(CCFLAGS=['-pthread','-Wall','-Wextra','-pedantic'])
+    env.Append(CXXFLAGS=['-std=c++14'])
+    env.Append(LINKFLAGS=['-pthread'])
+
+    if 'OPTIMIZE' in ARGUMENTS:
+        env.Append(CCFLAGS=['-O'+ARGUMENTS['OPTIMIZE']])
+    else:
+        env.Append(CCFLAGS=['-O3'])
+
+    if 'RELEASE' in ARGUMENTS and ARGUMENTS['RELEASE'] != '0':
+        env.Append(CPPDEFINES=['NDEBUG'])
+        env.Append(CPPFLAGS=['-s'])
+    else:
+        env.Append(CPPFLAGS=['-g'])
+
+    if 'PYTHON_VERSION' in ARGUMENTS:
+        env['PYTHON_VERSION'] = ARGUMENTS['PYTHON_VERSION']
+
+    env.AddMethod(shared_library_dir, 'SharedLibraryDir')
+    env.AddMethod(python_library_dir, 'PythonLibraryDir')
+    env.AddMethod(main_dir, 'MainDir')
+    env.AddMethod(unit_test_dir, 'UnitTestDir')
+    env.AddMethod(compile_folder_dwim, 'CompileFolderDWIM')
+    env.AddMethod(irrlicht_lib, 'IrrlichtLib')
+    env.AddMethod(is_special_dir, '_is_special_dir')
+
+    return env
 
 def ansi_colors(env):
     env['RESET_COLOR'] = '\033[39;49m'
@@ -96,7 +141,7 @@ def shared_library_dir(env, target=None, source=None, add_to_all_libs=True, depe
     else:
         src_dir = source
 
-    src_files = [src_dir.glob(g) for g in source_file_globs]
+    src_files = [src_dir.glob(g) for g in env['source_file_globs']]
 
     shlib = env.SharedLibrary(target, src_files)[0]
 
@@ -110,7 +155,7 @@ def shared_library_dir(env, target=None, source=None, add_to_all_libs=True, depe
         'LIBS':[shlib_name],
         }
 
-    env.Install(lib_dir, shlib)
+    env.Install(env['lib_dir'], shlib)
 
     if add_to_all_libs:
         all_libs.append(shlib)
@@ -222,14 +267,16 @@ def unit_test_dir(env, target=None, source=None,
 
     for dep in all_libs:
         env.Append(**dep.attributes.usage)
-    env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN',
-                                           bin_dir.rel_path(lib_dir)))])
+
+    if all_libs:
+        env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN',
+                                               env['bin_dir'].rel_path(env['lib_dir'])))])
 
     googletest_dir = get_googletest_dir()
     env.Append(CPPPATH=googletest_dir.Dir('googletest').RDirs('.'))
     env.Append(CPPPATH=googletest_dir.Dir('googletest/include').RDirs('.'))
 
-    src_files = [source.glob(g) for g in source_file_globs]
+    src_files = [source.glob(g) for g in env['source_file_globs']]
     src_files.extend(googletest_dir.glob('main.cc'))
     src_files.extend(googletest_dir.glob('googletest/src/gtest-all.cc'))
 
@@ -238,11 +285,11 @@ def unit_test_dir(env, target=None, source=None,
 
     if extra_src_dir is not None:
         extra_src_dir = Dir(extra_src_dir)
-        src_files.extend(extra_src_dir.glob(g) for g in source_file_globs)
+        src_files.extend(extra_src_dir.glob(g) for g in env['source_file_globs'])
 
     src_files = [env.Object(src.abspath) for src in Flatten(src_files)]
     prog = env.Program(target, src_files)
-    env.Install(bin_dir, prog)
+    env.Install(env['bin_dir'], prog)
 
 
 def get_googletest_dir():
@@ -287,7 +334,7 @@ def irrlicht_lib(env):
     src_dir = irrlicht_dir.Dir('source/Irrlicht')
 
     src_files = Flatten([src_dir.glob(g)
-                         for g in source_file_globs])
+                         for g in env['source_file_globs']])
 
     lzma_files = ['lzma/LzmaDec.c']
     zlib_files = ['zlib/adler32.c', 'zlib/compress.c', 'zlib/crc32.c', 'zlib/deflate.c',
@@ -341,7 +388,7 @@ def irrlicht_lib(env):
         }
     all_libs.append(shlib)
 
-    env.Install(lib_dir, shlib)
+    env.Install(env['lib_dir'], shlib)
 
     return shlib
 
@@ -373,19 +420,19 @@ def main_dir(env, main, inc_dir='include', src_dir='src'):
 
     inc_dir = main.Dir(inc_dir).RDirs('.')
 
-    src_files = [main.Dir(src_dir).glob(g) for g in source_file_globs]
-    main_files = [main.glob(g) for g in source_file_globs]
+    src_files = [main.Dir(src_dir).glob(g) for g in env['source_file_globs']]
+    main_files = [main.glob(g) for g in env['source_file_globs']]
 
     env = env.Clone()
     env.Append(CPPPATH=inc_dir)
     env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN',
-                                           bin_dir.rel_path(lib_dir)))])
+                                           env['bin_dir'].rel_path(env['lib_dir'])))])
     for shlib in all_libs:
         env.Append(**shlib.attributes.usage)
 
     progs = [env.Program([main_file] + src_files)
              for main_file in Flatten(main_files)]
-    env.Install(bin_dir, progs)
+    env.Install(env['bin_dir'], progs)
 
     return progs
 
@@ -407,11 +454,11 @@ def compile_folder_dwim(env, base_dir):
 
     else:
         for dir in base_dir.glob('lib*'):
-            if dir not in special_paths:
+            if not env._is_special_dir(dir):
                 env.SharedLibraryDir(dir)
 
         for dir in base_dir.glob('py*'):
-            if dir not in special_paths:
+            if not env._is_special_dir(dir):
                 env.PythonLibraryDir(dir)
 
         env.MainDir(base_dir)
@@ -421,70 +468,29 @@ def compile_folder_dwim(env, base_dir):
                             extra_inc_dir=base_dir.Dir('include'),
                             extra_src_dir=base_dir.Dir('src'))
 
-def default_environment():
-    """
-    The environment that is used to build everything.
-    """
-    env = Environment(ENV = os.environ)
-    env['CPPPATH'] = []
-    env['LIBPATH'] = []
-    env['RPATH'] = []
-    env['LIBS'] = []
+def is_special_dir(env, query):
+    query = Dir(query)
+    top_level = env['top_level']
+    bin_dir = env['bin_dir']
+    lib_dir = env['lib_dir']
 
-    if 'VERBOSE' not in ARGUMENTS:
-        brief_output(env)
+    special_paths = [build_dir,
+                     dep_dir,
+                     bin_dir,
+                     lib_dir,
+                     ]
 
-    if 'NOCOLOR' not in ARGUMENTS:
-        ansi_colors(env)
+    if bin_dir.is_under(top_level):
+        special_paths.append(build_dir.Dir(top_level.rel_path(bin_dir)))
+    if lib_dir.is_under(top_level):
+        special_paths.append(build_dir.Dir(top_level.rel_path(lib_dir)))
 
-    env.Append(CCFLAGS=['-pthread','-Wall','-Wextra','-pedantic'])
-    env.Append(CXXFLAGS=['-std=c++14'])
-    env.Append(LINKFLAGS=['-pthread'])
-
-    if 'OPTIMIZE' in ARGUMENTS:
-        env.Append(CCFLAGS=['-O'+ARGUMENTS['OPTIMIZE']])
-    else:
-        env.Append(CCFLAGS=['-O3'])
-
-    if 'RELEASE' in ARGUMENTS and ARGUMENTS['RELEASE'] != '0':
-        env.Append(CPPDEFINES=['NDEBUG'])
-        env.Append(CPPFLAGS=['-s'])
-    else:
-        env.Append(CPPFLAGS=['-g'])
-
-    if 'PYTHON_VERSION' in ARGUMENTS:
-        env['PYTHON_VERSION'] = ARGUMENTS['PYTHON_VERSION']
-
-    env.AddMethod(shared_library_dir, 'SharedLibraryDir')
-    env.AddMethod(python_library_dir, 'PythonLibraryDir')
-    env.AddMethod(main_dir, 'MainDir')
-    env.AddMethod(unit_test_dir, 'UnitTestDir')
-    env.AddMethod(compile_folder_dwim, 'CompileFolderDWIM')
-    env.AddMethod(irrlicht_lib, 'IrrlichtLib')
-
-    return env
+    return query in special_paths
 
 
 env = default_environment()
-env.VariantDir(build_dir,'.',duplicate=False)
 
-build_dir = Dir(build_dir)
+env.VariantDir(build_dir,'.',duplicate=False)
 dep_dir = build_dir.Dir('.dependencies')
 
-special_paths = [build_dir,
-                 Dir(bin_dir),
-                 Dir(lib_dir),
-                 build_dir.Dir(bin_dir),
-                 build_dir.Dir(lib_dir),
-                 dep_dir,
-]
-bin_dir = Dir(bin_dir)
-lib_dir = Dir(lib_dir)
-
 env.CompileFolderDWIM(build_dir)
-
-if bin_dir != Dir('.'):
-    env.Clean('.',bin_dir)
-
-if lib_dir != Dir('.'):
-    env.Clean('.',lib_dir)
