@@ -38,6 +38,23 @@ def add_common_nvcc_variables(env):
     # assemble the common command line
     env['_NVCCCOMCOM'] = '${_concat("-Xcompiler ", CPPFLAGS, "", __env__)} $_CPPDEFFLAGS $_NVCCWRAPCPPPATH'
 
+def has_cuda_files(source):
+  for s in source:
+    ext = os.path.splitext(str(s))[1]
+    if ext in CUDASuffixes:
+      return True
+
+    if has_cuda_files(s.sources):
+      return True
+
+  return False
+
+def cuda_lib_flags(source, target, env, for_signature):
+  if has_cuda_files(source):
+    return '-lcuda -lcudart'
+  else:
+    return ''
+
 def generate(env):
   """
   Add Builders and construction variables for CUDA compilers to an Environment.
@@ -88,7 +105,8 @@ def generate(env):
 
   env['CUDAFILESUFFIX'] = '.cu'
 
-  env.Append(LIBS = ['cuda', 'cudart'])
+  env['_CUDA_LIB_FLAGS'] = cuda_lib_flags
+  env['_LIBFLAGS'] += ' $_CUDA_LIB_FLAGS'
   env.Append(CPPDEFINES = ['CUDA_ENABLED'])
 
   env.AppendUnique(source_file_globs = ['*.cu'])

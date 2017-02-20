@@ -24,8 +24,8 @@ def default_environment():
     env['bin_dir'] = Dir('bin')
     env['lib_dir'] = Dir('lib')
     env['top_level'] = Dir('.')
-    env['source_file_globs'] = ['*.cc', '*.cpp', '*.cxx', '*.c++', '*.C++',
-                                '*.c', '*.C']
+    env.Append(source_file_globs = ['*.cc', '*.cpp', '*.cxx', '*.c++', '*.C++',
+                                    '*.c', '*.C'])
 
     # Because scons behaves poorly if these aren't initialized as lists
     env['CPPPATH'] = []
@@ -64,6 +64,9 @@ def default_environment():
     env.AddMethod(compile_folder_dwim, 'CompileFolderDWIM')
     env.AddMethod(irrlicht_lib, 'IrrlichtLib')
     env.AddMethod(is_special_dir, '_is_special_dir')
+    env.AddMethod(require_cuda, 'RequireCUDA')
+    env.AddMethod(optional_cuda, 'OptionalCUDA')
+    env.AddMethod(glob_src_dir, 'GlobSrcDir')
 
     return env
 
@@ -141,7 +144,7 @@ def shared_library_dir(env, target=None, source=None, add_to_all_libs=True, depe
     else:
         src_dir = source
 
-    src_files = [src_dir.glob(g) for g in env['source_file_globs']]
+    src_files = env.GlobSrcDir(src_dir)
 
     shlib = env.SharedLibrary(target, src_files)[0]
 
@@ -276,7 +279,7 @@ def unit_test_dir(env, target=None, source=None,
     env.Append(CPPPATH=googletest_dir.Dir('googletest').RDirs('.'))
     env.Append(CPPPATH=googletest_dir.Dir('googletest/include').RDirs('.'))
 
-    src_files = [source.glob(g) for g in env['source_file_globs']]
+    src_files = env.GlobSrcDir(source)
     src_files.extend(googletest_dir.glob('main.cc'))
     src_files.extend(googletest_dir.glob('googletest/src/gtest-all.cc'))
 
@@ -285,7 +288,7 @@ def unit_test_dir(env, target=None, source=None,
 
     if extra_src_dir is not None:
         extra_src_dir = Dir(extra_src_dir)
-        src_files.extend(extra_src_dir.glob(g) for g in env['source_file_globs'])
+        src_files.extend(env.GlobSrcDir(extra_src_dir))
 
     src_files = [env.Object(src.abspath) for src in Flatten(src_files)]
     prog = env.Program(target, src_files)
@@ -333,8 +336,7 @@ def irrlicht_lib(env):
 
     src_dir = irrlicht_dir.Dir('source/Irrlicht')
 
-    src_files = Flatten([src_dir.glob(g)
-                         for g in env['source_file_globs']])
+    src_files = env.GlobSrcDir(src_dir)
 
     lzma_files = ['lzma/LzmaDec.c']
     zlib_files = ['zlib/adler32.c', 'zlib/compress.c', 'zlib/crc32.c', 'zlib/deflate.c',
@@ -420,8 +422,8 @@ def main_dir(env, main, inc_dir='include', src_dir='src'):
 
     inc_dir = main.Dir(inc_dir).RDirs('.')
 
-    src_files = [main.Dir(src_dir).glob(g) for g in env['source_file_globs']]
-    main_files = [main.glob(g) for g in env['source_file_globs']]
+    src_files = env.GlobSrcDir(main.Dir(src_dir))
+    main_files = env.GlobSrcDir(main)
 
     env = env.Clone()
     env.Append(CPPPATH=inc_dir)
@@ -487,6 +489,62 @@ def is_special_dir(env, query):
 
     return query in special_paths
 
+def download_tool(tool_name):
+    # If scons-tools is present, use it instead of downloading a copy.
+    output_file = File('#/scons-tools/{}.py'.format(tool_name).abspath
+    if os.path.exists(output_file):
+        return open_module(output_file)
+
+    # If a downloaded copy exists, use it.
+    output_dir = dep_dir.Dir('scons-tools').abspath
+    output_file = '{}/{}.py'.format(output_dir,tool_name)
+    if os.path.exists(output_file):
+        return open_module(output_file)
+
+    # Otherwise, download the tool.
+    import urllib2
+    full_path = ('https://raw.githubusercontent.com/Lunderberg/'
+                 'magic_cpp_makefile/master/scons-tools/'
+                 '{}.py').format(tool_name)
+    resp = urllib2.urlopen(full_path)
+
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+
+    with open(output_file,'wb') as f:
+        f.write(resp.read())
+
+    return open_module(output_file)
+
+def open_module(filename):
+    old_sys_path = sys.path[:]
+
+    module_path, base_name = os.path.split(filename)
+    module_name = os.path.splitext(base_name)[0]
+
+    try:
+        sys.path.insert(0, module_path)
+        module = __import__(module_name)
+        return module
+    finally:
+        sys.path = old_sys_path
+
+def require_cuda(env):
+    nvcc = download_tool('nvcc')
+    nvcc.generate(env)
+
+def optional_cuda(env):
+    if not ARGUMENTS.get('disable-cuda',0):
+        try:
+            require_cuda(env)
+        except EnvironmentError:
+            pass
+
+def glob_src_dir(env, dir):
+    result = Flatten([dir.glob(g) for g in env['source_file_globs']])
+    return Flatten([dir.glob(g) for g in env['source_file_globs']])
 
 env = default_environment()
 
@@ -494,3 +552,6 @@ env.VariantDir(build_dir,'.',duplicate=False)
 dep_dir = build_dir.Dir('.dependencies')
 
 env.CompileFolderDWIM(build_dir)
+
+#import pudb; pudb.set_trace()
+#env.subst('$LINKCOM')
