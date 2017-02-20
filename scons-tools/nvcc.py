@@ -20,6 +20,13 @@ CUDASuffixes = ['.cu']
 # cuda uses the c preprocessor, so we can use the CScanner
 CUDAScanner = SCons.Scanner.C.CScanner()
 
+def wrap_flags_nvcc(env, flags):
+  flags = [f for flagset in flags
+           for f in env.subst(flagset).split()
+           if 'pedantic' not in f]
+  return ' '.join('-Xcompiler ' + flag
+                  for flag in flags)
+
 def add_common_nvcc_variables(env):
   """
   Add underlying common "NVIDIA CUDA compiler" variables that
@@ -30,11 +37,13 @@ def add_common_nvcc_variables(env):
   if not env.has_key('_NVCCCOMCOM'):
     # nvcc needs '-I' prepended before each include path, regardless of platform
     env['_NVCCWRAPCPPPATH'] = '${_concat("-I ", CPPPATH, "", __env__)}'
-    # prepend -Xcompiler before each flag
-    env['_NVCCWRAPCFLAGS'] =     '${_concat("-Xcompiler ", CFLAGS,     "", __env__)}'
-    env['_NVCCWRAPSHCFLAGS'] =   '${_concat("-Xcompiler ", SHCFLAGS,   "", __env__)}'
-    env['_NVCCWRAPCCFLAGS'] =   '${_concat("-Xcompiler ", CCFLAGS,   "", __env__)}'
-    env['_NVCCWRAPSHCCFLAGS'] = '${_concat("-Xcompiler ", SHCCFLAGS, "", __env__)}'
+    # prepend -Xcompiler before each flag, removing -pedantic
+    # -pedantic causes loads of "style of line directive is a gcc extension" warnings
+    env['_wrap_flags_nvcc'] = wrap_flags_nvcc
+    env['_NVCCWRAPCFLAGS'] = '${_wrap_flags_nvcc(__env__,CFLAGS)}'
+    env['_NVCCWRAPSHCFLAGS'] = '${_wrap_flags_nvcc(__env__,SHCFLAGS)}'
+    env['_NVCCWRAPCCFLAGS'] = '${_wrap_flags_nvcc(__env__,CCFLAGS)}'
+    env['_NVCCWRAPSHCCFLAGS'] = '${_wrap_flags_nvcc(__env__,SHCCFLAGS)}'
     # assemble the common command line
     env['_NVCCCOMCOM'] = '${_concat("-Xcompiler ", CPPFLAGS, "", __env__)} $_CPPDEFFLAGS $_NVCCWRAPCPPPATH'
 
