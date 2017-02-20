@@ -5,3 +5,4 @@ bin
 lib
 .build-target
 .sconsign.dblite
+*.pyc

@@ -103,12 +103,14 @@ def brief_output(env):
     """
     Edits the various command strings printed to screen to be briefer.
     """
-    env['CXXCOMSTR']    = '${DBLUE}Compiling C++ object ${DCYAN}${TARGETS}${RESET_COLOR}'
     env['CCCOMSTR']     = '${DBLUE}Compiling C object ${DCYAN}${TARGETS}${RESET_COLOR}'
+    env['CXXCOMSTR']    = '${DBLUE}Compiling C++ object ${DCYAN}${TARGETS}${RESET_COLOR}'
+    env['NVCCCOMSTR']   = '${DBLUE}Compiling C++ CUDA object ${DCYAN}${TARGETS}${RESET_COLOR}'
     env['ARCOMSTR']     = '${DBLUE}Packing static library ${DCYAN}${TARGETS}${RESET_COLOR}'
     env['RANLIBCOMSTR'] = '${DBLUE}Indexing static library ${DCYAN}${TARGETS}${RESET_COLOR}'
     env['SHCCCOMSTR']   = '${DBLUE}Compiling shared C object ${DCYAN}${TARGETS}${RESET_COLOR}'
     env['SHCXXCOMSTR']  = '${DBLUE}Compiling shared C++ object ${DCYAN}${TARGETS}${RESET_COLOR}'
+    env['SHNVCCCOMSTR'] = '${DBLUE}Compiling shared C++ CUDA object ${DCYAN}${TARGETS}${RESET_COLOR}'
     env['LINKCOMSTR']   = '${DBLUE}Linking ${DCYAN}${TARGETS}${RESET_COLOR}'
     env['SHLINKCOMSTR'] = '${DBLUE}Linking shared ${DCYAN}${TARGETS}${RESET_COLOR}'
 

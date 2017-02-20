@@ -72,12 +72,14 @@ def generate(env):
   env['BUILDERS']['PTXFile'] = ptx_builder
 
   # create builders that make static & shared objects from .cu files
+  CUAction = SCons.Action.Action('$NVCCCOM','$NVCCCOMSTR')
+  ShCUAction = SCons.Action.Action('$SHNVCCCOM','$SHNVCCCOMSTR')
   static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
 
   for suffix in CUDASuffixes:
     # Add this suffix to the list of things buildable by Object
-    static_obj.add_action('$CUDAFILESUFFIX', '$NVCCCOM')
-    shared_obj.add_action('$CUDAFILESUFFIX', '$SHNVCCCOM')
+    static_obj.add_action('$CUDAFILESUFFIX', CUAction)
+    shared_obj.add_action('$CUDAFILESUFFIX', ShCUAction)
     static_obj.add_emitter(suffix, SCons.Defaults.StaticObjectEmitter)
     shared_obj.add_emitter(suffix, SCons.Defaults.SharedObjectEmitter)
 
