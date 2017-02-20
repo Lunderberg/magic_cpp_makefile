@@ -491,7 +491,7 @@ def is_special_dir(env, query):
 
 def download_tool(tool_name):
     # If scons-tools is present, use it instead of downloading a copy.
-    output_file = File('#/scons-tools/{}.py'.format(tool_name).abspath
+    output_file = File('#/scons-tools/{}.py'.format(tool_name)).abspath
     if os.path.exists(output_file):
         return open_module(output_file)
 
