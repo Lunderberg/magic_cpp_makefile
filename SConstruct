@@ -554,6 +554,3 @@ env.VariantDir(build_dir,'.',duplicate=False)
 dep_dir = build_dir.Dir('.dependencies')
 
 env.CompileFolderDWIM(build_dir)
-
-#import pudb; pudb.set_trace()
-#env.subst('$LINKCOM')
