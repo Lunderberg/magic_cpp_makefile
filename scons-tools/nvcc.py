@@ -10,8 +10,10 @@ selection method.
 import SCons.Tool
 import SCons.Scanner.C
 import SCons.Defaults
+
 import os
 import platform
+import distutils
 
 
 CUDASuffixes = ['.cu']
@@ -26,6 +28,12 @@ def wrap_flags_nvcc(env, flags):
              if 'pedantic' not in f]
     return ' '.join('-Xcompiler ' + flag
                     for flag in flags)
+
+def nvcc_host_compiler(source, target, env, for_signature):
+    cxx = env.subst('$CXX')
+    full_path = distutils.spawn.find_executable(cxx)
+    escaped = env['ESCAPE'](full_path)
+    return escaped
 
 def add_common_nvcc_variables(env):
     """
@@ -45,7 +53,10 @@ def add_common_nvcc_variables(env):
         env['_NVCCWRAPCCFLAGS'] = '${_wrap_flags_nvcc(__env__,CCFLAGS)}'
         env['_NVCCWRAPSHCCFLAGS'] = '${_wrap_flags_nvcc(__env__,SHCCFLAGS)}'
         # assemble the common command line
-        env['_NVCCCOMCOM'] = '${_concat("-Xcompiler ", CPPFLAGS, "", __env__)} $_CPPDEFFLAGS $_NVCCWRAPCPPPATH'
+        env['_NVCC_HOST_COMPILER'] = nvcc_host_compiler
+        env['_NVCCCOMCOM'] = ('${_concat("-Xcompiler ", CPPFLAGS, "", __env__)} '
+                              '$_CPPDEFFLAGS $_NVCCWRAPCPPPATH '
+                              '--compiler-bindir=$_NVCC_HOST_COMPILER ')
 
 def has_cuda_files(source):
     for s in source:
