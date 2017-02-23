@@ -248,7 +248,7 @@ def get_pybind11_dir():
     import urllib2
     import StringIO
     import zipfile
-    response = urllib2.urlopen('https://github.com/Lunderberg/pybind11/archive/master.zip')
+    response = urllib2.urlopen('https://github.com/pybind/pybind11/archive/master.zip')
     contents = StringIO.StringIO(response.read())
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist()
