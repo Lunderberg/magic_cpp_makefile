@@ -400,7 +400,7 @@ LibMakefile.inc:
 
 # Rules to copy each library into their final location.
 $(call SHARED_LIBRARY_NAME,%): build/$(BUILD)/$(call SHARED_LIBRARY_NAME,%) .build-target
-	@$(call run_and_test,cp --remove-destination $< $@,Copying  )
+	@$(call run_and_test,rm -f $@ && cp $< $@,Copying  )
 
 $(call STATIC_LIBRARY_NAME,%): build/$(BUILD)/$(call STATIC_LIBRARY_NAME,%) .build-target
 	@$(call run_and_test,cp -f $< $@,Copying  )
@@ -445,7 +445,7 @@ define library_commands
 
   # Copy the libraries into their final location
   $$(SHARED_LIBRARY_FILENAME): build/$$(BUILD)/$$(SHARED_LIBRARY_FILENAME) .build-target
-	@$$(call run_and_test,cp --remove-destination $$< $$@,Copying  )
+	@$$(call run_and_test,rm -f $$@ && cp $$< $$@,Copying  )
 
   $$(STATIC_LIBRARY_FILENAME): build/$$(BUILD)/$$(STATIC_LIBRARY_FILENAME) .build-target
 	@$$(call run_and_test,cp -f $$< $$@,Copying  )
