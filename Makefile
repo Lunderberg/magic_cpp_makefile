@@ -97,7 +97,7 @@ CXXFLAGS_EXTRA = -std=c++11
 # Mandatory arguments to the linker, before the listing of object
 # files.  These arguments will be passed even if LDFLAGS has been
 # overridden by command-line arguments.
-LDFLAGS_EXTRA  = -Llib -Wl,-rpath,\$$ORIGIN/../lib -Wl,--no-as-needed
+LDFLAGS_EXTRA  = -Llib -Wl,-rpath,\$$ORIGIN/../lib
 
 # Mandatory arguments to the linker, after the listing of object
 # files.  These arguments will be passed even if LDLIBS has been
