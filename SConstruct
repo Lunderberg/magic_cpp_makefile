@@ -20,6 +20,9 @@ def default_environment():
     The environment that is used to build everything.
     """
     env = Environment(ENV = os.environ)
+    env['CC'] = os.environ.get('CC', env['CC'])
+    env['CXX'] = os.environ.get('CXX', env['CXX'])
+    env['ENV'].update(val for val in os.environ.items() if val[0].startswith('CCC_'))
 
     env['bin_dir'] = Dir('bin')
     env['lib_dir'] = Dir('lib')
