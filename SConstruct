@@ -43,6 +43,12 @@ def default_environment():
     if 'NOCOLOR' not in ARGUMENTS:
         ansi_colors(env)
 
+    # OSX errors if there are undefined symbols in a shared library.
+    # This is not desirable, because the symbols could be present in a
+    # different library, or in the main executable.
+    if sys.platform=='darwin' and 'clang' in env['CC']:
+        env.Append(SHLINKFLAGS=['-undefined','dynamic_lookup'])
+
     env.Append(CCFLAGS=['-pthread','-Wall','-Wextra','-pedantic'])
     env.Append(CXXFLAGS=['-std=c++14'])
     env.Append(LINKFLAGS=['-pthread'])
