@@ -53,7 +53,11 @@ def default_environment():
     env.Append(CXXFLAGS=['-std=c++14'])
     env.Append(LINKFLAGS=['-pthread'])
 
-    if 'OPTIMIZE' in ARGUMENTS:
+
+    if 'CODE_COVERAGE' in ARGUMENTS:
+        env.Append(CPPFLAGS=['--coverage'])
+        env.Append(LINKFLAGS=['--coverage'])
+    elif 'OPTIMIZE' in ARGUMENTS:
         env.Append(CCFLAGS=['-O'+ARGUMENTS['OPTIMIZE']])
     else:
         env.Append(CCFLAGS=['-O3'])
