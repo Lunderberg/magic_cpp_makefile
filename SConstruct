@@ -142,10 +142,14 @@ def shared_library_dir(env, target=None, source=None, is_python_lib=False, depen
     if target is None:
         target = os.path.join(str(source), source.name)
 
+    dependencies_inc_dir = []
     if dependencies is not None:
         dependencies = find_libraries(dependencies)
         for dep in dependencies:
             env.Append(**dep.attributes.usage)
+            if 'CPPPATH' in dep.attributes.usage:
+                dependencies_inc_dir.extend(dep.attributes.usage['CPPPATH'])
+
         if dependencies:
             from_dir = env['pylib_dir'] if is_python_lib else env['lib_dir']
             rel_path = from_dir.rel_path(env['lib_dir'])
@@ -172,7 +176,7 @@ def shared_library_dir(env, target=None, source=None, is_python_lib=False, depen
     shlib_name = shlib.name[len(prefix):-len(suffix)]
 
     shlib.attributes.usage = {
-        'CPPPATH':inc_dir,
+        'CPPPATH':inc_dir + dependencies_inc_dir,
         'LIBPATH':[shlib.dir],
         'LIBS':[shlib_name],
         }
