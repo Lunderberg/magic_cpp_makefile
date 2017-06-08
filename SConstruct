@@ -405,7 +405,7 @@ def irrlicht_lib(env):
     shlib.attributes.usage = {
         'CPPPATH': [inc_dir],
         'LIBPATH': shlib.dir,
-        'LIBS': 'Irrlicht',
+        'LIBS': ['Irrlicht'],
         'CPPDEFINES': defines,
         }
     all_libs.append(shlib)
