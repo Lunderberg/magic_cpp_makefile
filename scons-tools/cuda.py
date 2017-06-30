@@ -144,5 +144,7 @@ def generate(env):
     cplusplus = getattr(SCons.Tool,'c++')
     cplusplus.CXXSuffixes.append('.cu')
 
+    return {}
+
 def exists(env):
     return env.Detect('nvcc')
