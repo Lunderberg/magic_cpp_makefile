@@ -80,8 +80,6 @@ def default_environment():
     env.AddMethod(compile_folder_dwim, 'CompileFolderDWIM')
     env.AddMethod(irrlicht_lib, 'IrrlichtLib')
     env.AddMethod(is_special_dir, '_is_special_dir')
-    env.AddMethod(require_cuda, 'RequireCUDA')
-    env.AddMethod(optional_cuda, 'OptionalCUDA')
     env.AddMethod(glob_src_dir, 'GlobSrcDir')
     env.AddMethod(non_variant_dir, 'NonVariantDir')
 
@@ -152,27 +150,16 @@ def brief_output(env):
 all_libs = {}
 def shared_library_dir(env, target=None, source=None, is_python_lib=False,
                        dependencies=None, requires=None, optional=None):
-    env = env.Clone()
-
     if source is None:
         source = target
         target = None
 
-    if requires is None:
-        requires = []
-    elif isinstance(requires, str):
-        requires = [requires]
-
     if optional is None:
         optional = []
-    elif isinstance(optional, str):
-        optional = [optional]
 
-    if dependencies is not None:
-        if isinstance(dependencies, str):
-            requires.append(dependencies)
-        else:
-            requires.extend(dependencies)
+    
+    env = env.Clone()
+
 
     source = Dir(source)
 
@@ -184,23 +171,17 @@ def shared_library_dir(env, target=None, source=None, is_python_lib=False,
     else:
         lib_name = os.path.splitext(os.path.split(str(target))[1])[0]
 
+
     if is_python_lib:
         optional.append(lib_name)
 
-    dependencies_inc_dir = []
-    dependencies_system_inc_dir = []
 
-    requires = find_libraries(env, requires, required=True)
-    optional = find_libraries(env, optional, required=False)
-    for dep in requires+optional:
-        opts = extract_opts(dep)
-        env.Append(**opts)
-        if 'CPPPATH' in opts:
-            dependencies_inc_dir.extend(dep['CPPPATH'])
-        if 'CPPSYSTEMPATH' in opts:
-            dependencies_system_inc_dir.extend(dep['CPPSYSTEMPATH'])
+    libs_before = len(env['LIBS'])
+    transitive = add_dependencies(env, dependencies, requires, optional)
+    depends_on_libs = (len(env['LIBS']) != libs_before)
 
-    if any('LIBS' in extract_opts(dep) for dep in requires+optional):
+
+    if depends_on_libs:
         from_dir = env['pylib_dir'] if is_python_lib else env['lib_dir']
         rel_path = from_dir.rel_path(env['lib_dir'])
         env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN',rel_path))])
@@ -232,8 +213,9 @@ def shared_library_dir(env, target=None, source=None, is_python_lib=False,
     shlib_name = shlib.name[len(prefix):-len(suffix)]
 
     shlib.attributes.usage = {
-        'CPPPATH':inc_dir + dependencies_inc_dir,
-        'CPPSYSTEMPATH': dependencies_system_inc_dir,
+        'CPPPATH':inc_dir + transitive['CPPPATH'],
+        'CPPSYSTEMPATH': transitive['CPPSYSTEMPATH'],
+        'CPPDEFINES': transitive['CPPDEFINES'],
         'LIBPATH':[shlib.dir],
         'LIBS':[shlib_name],
         }
@@ -245,13 +227,6 @@ def shared_library_dir(env, target=None, source=None, is_python_lib=False,
         all_libs[shlib_name.lower()] = shlib.attributes.usage
 
     return shlib
-
-
-def extract_opts(dep):
-    if isinstance(dep, dict):
-        return dep
-    else:
-        return dep.attributes.usage
 
 
 def find_libraries(env, lib_names, required):
@@ -353,8 +328,10 @@ def get_pybind11_dir():
 
 
 def unit_test_dir(env, target=None, source=None,
-                  extra_inc_dir=None, extra_src_dir=None):
+                  extra_inc_dir=None, extra_src_dir=None,
+                  dependencies=None, requires=None, optional=None):
     env = env.Clone()
+    add_dependencies(env, dependencies, requires, optional)
 
     if source is None:
         source = target
@@ -513,7 +490,47 @@ def get_irrlicht_dir():
     return dep_dir.glob('irrlicht*')[0]
 
 
-def main_dir(env, main, inc_dir='include', src_dir='src'):
+def add_dependencies(env, dependencies, requires, optional):
+    if requires is None:
+        requires = []
+    elif isinstance(requires, str):
+        requires = [requires]
+
+    if optional is None:
+        optional = []
+    elif isinstance(optional, str):
+        optional = [optional]
+
+    if dependencies is not None:
+        if isinstance(dependencies, str):
+            requires.append(dependencies)
+        else:
+            requires.extend(dependences)
+
+    transitive = {'CPPPATH': [],
+                  'CPPSYSTEMPATH': [],
+                  'CPPDEFINES': [],
+                  }
+
+    requires = find_libraries(env, requires, required=True)
+    optional = find_libraries(env, optional, required=False)
+    for dep in requires+optional:
+        env.Append(**dep)
+        for key in transitive:
+            if key in dep:
+                transitive[key].extend(dep[key])
+
+    return transitive
+
+
+
+
+
+def main_dir(env, main, inc_dir='include', src_dir='src',
+             dependencies=None, requires=None, optional=None):
+    env = env.Clone()
+    add_dependencies(env, dependencies, requires, optional)
+
     main = Dir(main)
 
     inc_dir = main.Dir(inc_dir).RDirs('.')
@@ -521,7 +538,6 @@ def main_dir(env, main, inc_dir='include', src_dir='src'):
     src_files = env.GlobSrcDir(main.Dir(src_dir))
     main_files = env.GlobSrcDir(main)
 
-    env = env.Clone()
     env.Append(CPPPATH=inc_dir)
     env.Append(RPATH=[Literal(os.path.join('\\$$ORIGIN',
                                            env['bin_dir'].rel_path(env['lib_dir'])))])
@@ -535,14 +551,19 @@ def main_dir(env, main, inc_dir='include', src_dir='src'):
     return progs
 
 
-def compile_folder_dwim(env, base_dir):
+def compile_folder_dwim(env, base_dir,
+                        dependencies=None, requires=None, optional=None):
     base_dir = Dir(base_dir)
 
     sconscript = base_dir.glob('SConscript')
     # The extra "base_dir != Dir('.')" is to prevent infinite
     # recursion, if a SConscript calls CompileFolderDWIM.
     if sconscript and base_dir != Dir('.'):
+        env_bak = env
+        env = env.Clone()
+        add_dependencies(env, dependencies, requires, optional)
         output = env.SConscript(sconscript, exports=['env'])
+        env = env_bak
         try:
             shlib_name = output.attributes.usage['LIBS'][0]
         except (AttributeError,IndexError):
@@ -556,18 +577,20 @@ def compile_folder_dwim(env, base_dir):
     else:
         for dir in base_dir.glob('lib*'):
             if not env._is_special_dir(dir):
-                env.SharedLibraryDir(dir)
+                env.SharedLibraryDir(dir, dependencies=dependencies, requires=requires, optional=optional)
 
         for dir in base_dir.glob('py*'):
             if not env._is_special_dir(dir):
-                env.PythonLibraryDir(dir)
+                env.PythonLibraryDir(dir, dependencies=dependencies, requires=requires, optional=optional)
 
-        env.MainDir(base_dir)
+        env.MainDir(base_dir, dependencies=dependencies, requires=requires, optional=optional)
 
         if base_dir.glob('tests'):
             env.UnitTestDir(base_dir.glob('tests')[0],
                             extra_inc_dir=base_dir.Dir('include'),
-                            extra_src_dir=base_dir.Dir('src'))
+                            extra_src_dir=base_dir.Dir('src'),
+                            dependencies=dependencies, requires=requires, optional=optional,
+            )
 
 def is_special_dir(env, query):
     query = Dir(query)
@@ -629,17 +652,6 @@ def open_module(filename):
         return module
     finally:
         sys.path = old_sys_path
-
-def require_cuda(env):
-    nvcc = download_tool('cuda')
-    nvcc.generate(env)
-
-def optional_cuda(env):
-    if not ARGUMENTS.get('disable-cuda',0):
-        try:
-            require_cuda(env)
-        except EnvironmentError:
-            pass
 
 def glob_src_dir(env, dir):
     result = Flatten([dir.glob(g) for g in env['source_file_globs']])
