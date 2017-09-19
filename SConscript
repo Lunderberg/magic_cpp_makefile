@@ -1,3 +1,3 @@
 Import('env')
 
-env.CompileFolderDWIM('.', optional=['cuda'], requires=['asio'])
+env.CompileFolderDWIM('.', optional=['cuda'], requires=['websocketpp'])

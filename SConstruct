@@ -82,6 +82,7 @@ def default_environment():
     env.AddMethod(is_special_dir, '_is_special_dir')
     env.AddMethod(glob_src_dir, 'GlobSrcDir')
     env.AddMethod(non_variant_dir, 'NonVariantDir')
+    env.AddMethod(find_libraries, 'FindLibraries')
 
     return env
 
@@ -229,7 +230,7 @@ def shared_library_dir(env, target=None, source=None, is_python_lib=False,
     return shlib
 
 
-def find_libraries(env, lib_names, required):
+def find_libraries(env, lib_names, required=True):
     lib_names = [name.lower() for name in lib_names]
 
     output = []
