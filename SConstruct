@@ -506,7 +506,7 @@ def add_dependencies(env, dependencies, requires, optional):
         if isinstance(dependencies, str):
             requires.append(dependencies)
         else:
-            requires.extend(dependences)
+            requires.extend(dependencies)
 
     transitive = {'CPPPATH': [],
                   'CPPSYSTEMPATH': [],
