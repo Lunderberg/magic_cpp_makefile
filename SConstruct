@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib2
 
 import SCons
 
@@ -259,7 +260,15 @@ def download_compile_dependency(env, lib_name, required):
         else:
             return None
 
-    tool = download_tool(lib_name)
+    try:
+        tool = download_tool(lib_name)
+    except urllib2.HTTPError as e:
+        if required:
+            e.message = (e.message +
+                         '\nCould not download required library "{}"'.format(lib_name))
+            raise
+        else:
+            return None
 
     if not tool.exists(env):
         if required:
