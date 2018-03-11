@@ -4,7 +4,7 @@ def exists(env):
     return True
 
 def generate(env):
-    inc_dir = env['dep_dir'].Dir('json-master/src')
+    inc_dir = env['dep_dir'].Dir('json-master/include')
 
     usage = {'CPPSYSTEMPATH': [inc_dir],
              }
@@ -20,7 +20,7 @@ def generate(env):
     contents = StringIO.StringIO(response.read())
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist()
-               if 'json.hpp' in filename or 'LICENSE' in filename]
+               if 'include' in filename or 'LICENSE' in filename]
     zipped.extractall(env['dep_dir'].abspath, members)
 
     return usage
