@@ -6,7 +6,9 @@ build_dir = Dir('build')
 
 # ------------------- implementation section -------------------
 
+import imp
 import os
+import random
 import re
 import subprocess
 import sys
@@ -651,17 +653,9 @@ def download_tool(tool_name):
     return open_module(output_file)
 
 def open_module(filename):
-    old_sys_path = sys.path[:]
-
-    module_path, base_name = os.path.split(filename)
-    module_name = os.path.splitext(base_name)[0]
-
-    try:
-        sys.path.insert(0, module_path)
-        module = __import__(module_name)
-        return module
-    finally:
-        sys.path = old_sys_path
+    dummy_name = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz')
+                         for _ in range(10))
+    return imp.load_source(dummy_name, filename)
 
 def glob_src_dir(env, dir):
     result = Flatten([dir.glob(g) for g in env['source_file_globs']])
