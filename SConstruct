@@ -6,13 +6,17 @@ build_dir = Dir('build')
 
 # ------------------- implementation section -------------------
 
+
+import distutils.spawn
+import io
 import imp
 import os
 import random
 import re
 import subprocess
 import sys
-import urllib2
+import urllib.request
+import zipfile
 
 import SCons
 
@@ -32,7 +36,7 @@ def default_environment():
     env['pylib_dir'] = env['lib_dir']
     env['top_level'] = Dir('.')
     env.Append(source_file_globs = ['*.cc', '*.cpp', '*.cxx', '*.c++', '*.C++',
-                                    '*.c', '*.C'])
+                                    '*.c', '*.C', '*.cu'])
 
     # Because scons behaves poorly if these aren't initialized as lists
     env['CPPPATH'] = []
@@ -264,7 +268,7 @@ def download_compile_dependency(env, lib_name, required):
 
     try:
         tool = download_tool(lib_name)
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         if required:
             e.message = (e.message +
                          '\nCould not download required library "{}"'.format(lib_name))
@@ -295,8 +299,6 @@ def find_python_include(python_version = None):
     If python_version is specied, look for that one.
     Otherwise, search for python3, then python, then python2.
     """
-    import distutils.spawn
-    import subprocess
 
     if python_version is None:
         python_versions = ['python3','python','python2']
@@ -313,7 +315,7 @@ def find_python_include(python_version = None):
     output = subprocess.check_output([exe, '-c',
                                       'from distutils.sysconfig import get_python_inc;'
                                       'print (get_python_inc())'])
-    return output[:-1] # remove training newline
+    return output.decode('utf-8').strip()
 
 
 def get_pybind11_dir():
@@ -326,11 +328,8 @@ def get_pybind11_dir():
     if folder.exists():
         return folder
 
-    import urllib2
-    import StringIO
-    import zipfile
-    response = urllib2.urlopen('https://github.com/pybind/pybind11/archive/master.zip')
-    contents = StringIO.StringIO(response.read())
+    response = urllib.request.urlopen('https://github.com/pybind/pybind11/archive/master.zip')
+    contents = io.BytesIO(response.read())
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist()
                if 'include' in filename or 'LICENSE' in filename]
@@ -385,11 +384,8 @@ def get_googletest_dir():
     if folder.exists():
         return folder
 
-    import urllib2
-    import StringIO
-    import zipfile
-    response = urllib2.urlopen('https://github.com/google/googletest/archive/master.zip')
-    contents = StringIO.StringIO(response.read())
+    response = urllib.request.urlopen('https://github.com/google/googletest/archive/master.zip')
+    contents = io.BytesIO(response.read())
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist() if
                'googletest/include' in filename or
@@ -485,12 +481,9 @@ def get_irrlicht_dir():
     if folder:
         return folder[0]
 
-    import urllib2
-    import StringIO
-    import zipfile
-    response = urllib2.urlopen('https://downloads.sourceforge.net/project/irrlicht/Irrlicht%20SDK/1.8/1.8.4/irrlicht-1.8.4.zip')
+    response = urllib.request.urlopen('https://downloads.sourceforge.net/project/irrlicht/Irrlicht%20SDK/1.8/1.8.4/irrlicht-1.8.4.zip')
 
-    contents = StringIO.StringIO(response.read())
+    contents = io.BytesIO(response.read())
     zipped = zipfile.ZipFile(contents)
 
     members = [filename for filename in zipped.namelist() if
@@ -636,11 +629,10 @@ def download_tool(tool_name):
         return open_module(output_file)
 
     # Otherwise, download the tool.
-    import urllib2
     full_path = ('https://raw.githubusercontent.com/Lunderberg/'
                  'magic_cpp_makefile/master/scons-tools/'
                  '{}.py').format(tool_name)
-    resp = urllib2.urlopen(full_path)
+    resp = urllib.request.urlopen(full_path)
 
 
     if not os.path.exists(output_dir):

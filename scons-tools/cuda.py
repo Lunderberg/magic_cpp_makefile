@@ -141,8 +141,7 @@ def generate(env):
     env.Append(NVCCFLAGS = ['-std=c++11', '-D_FORCE_INLINES',
                             '-arch={}'.format(architecture), '--expt-extended-lambda', '-m64'])
 
-    cplusplus = getattr(SCons.Tool,'c++')
-    cplusplus.CXXSuffixes.append('.cu')
+    SCons.Tool.cxx.CXXSuffixes.append('.cu')
 
     return {}
 

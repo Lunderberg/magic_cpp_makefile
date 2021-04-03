@@ -1,4 +1,5 @@
-
+import os
+import urllib
 
 def exists(env):
     return True
@@ -12,11 +13,10 @@ def generate(env):
     if inc_dir.exists():
         return usage
 
-    import os
-    import urllib2
 
-    response = urllib2.urlopen('https://github.com/CLIUtils/CLI11/releases/download/'
-                               'v1.1.0/CLI11.hpp')
+    response = urllib.request.urlopen(
+        'https://github.com/CLIUtils/CLI11/releases/download/'
+        'v1.1.0/CLI11.hpp')
     contents = response.read()
 
     os.makedirs(str(inc_dir))

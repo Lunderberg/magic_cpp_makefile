@@ -1,4 +1,6 @@
-
+import io
+import urllib
+import zipfile
 
 def exists(env):
     return True
@@ -13,13 +15,11 @@ def generate(env):
     if inc_dir.exists():
         return usage
 
-    import urllib2
-    import StringIO
-    import zipfile
 
-    response = urllib2.urlopen('https://downloads.sourceforge.net/project/'
-                               'asio/asio/1.10.6%20%28Stable%29/asio-1.10.6.zip')
-    contents = StringIO.StringIO(response.read())
+    response = urllib.request.urlopen(
+        'https://downloads.sourceforge.net/project/'
+        'asio/asio/1.10.6%20%28Stable%29/asio-1.10.6.zip')
+    contents = io.BytesIO(response.read())
     zipped = zipfile.ZipFile(contents)
 
     members = [filename for filename in zipped.namelist() if

@@ -1,3 +1,6 @@
+import io
+import urllib
+import zipfile
 
 def exists(env):
     return True
@@ -18,12 +21,9 @@ def generate(env):
     if inc_dir.exists():
         return usage
 
-    import urllib2
-    import StringIO
-    import zipfile
 
-    response = urllib2.urlopen('https://github.com/Lunderberg/eweb/archive/master.zip')
-    contents = StringIO.StringIO(response.read())
+    response = urllib.request.urlopen('https://github.com/Lunderberg/eweb/archive/master.zip')
+    contents = io.BytesIO(response.read())
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist()
                if 'eweb-master/include/' in filename]

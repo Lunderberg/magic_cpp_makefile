@@ -1,3 +1,6 @@
+import io
+import urllib
+import zipfile
 
 
 def exists(env):
@@ -12,12 +15,9 @@ def generate(env):
     if inc_dir.exists():
         return usage
 
-    import urllib2
-    import StringIO
-    import zipfile
 
-    response = urllib2.urlopen('https://github.com/nlohmann/json/archive/master.zip')
-    contents = StringIO.StringIO(response.read())
+    response = urllib.request.urlopen('https://github.com/nlohmann/json/archive/master.zip')
+    contents = io.BytesIO(response.read())
     zipped = zipfile.ZipFile(contents)
     members = [filename for filename in zipped.namelist()
                if 'include' in filename or 'LICENSE' in filename]
