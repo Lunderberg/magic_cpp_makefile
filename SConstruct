@@ -270,8 +270,8 @@ def download_compile_dependency(env, lib_name, required):
         tool = download_tool(lib_name)
     except urllib.error.HTTPError as e:
         if required:
-            e.message = (e.message +
-                         '\nCould not download required library "{}"'.format(lib_name))
+            e.msg = (e.msg +
+                     '\nCould not download required library "{}"'.format(lib_name))
             raise
         else:
             return None
