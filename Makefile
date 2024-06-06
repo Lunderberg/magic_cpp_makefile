@@ -92,7 +92,7 @@ CFLAGS_EXTRA =
 
 # Mandatory arguments to the C++ compiler.  These arguments will be
 # passed even if CXXFLAGS has been overridden by command-line arguments.
-CXXFLAGS_EXTRA = -std=c++11
+CXXFLAGS_EXTRA = -std=c++17
 
 # Mandatory arguments to the linker, before the listing of object
 # files.  These arguments will be passed even if LDFLAGS has been
